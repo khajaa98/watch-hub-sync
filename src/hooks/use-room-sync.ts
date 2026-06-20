@@ -63,7 +63,6 @@ import {
   RoomEvent,
   ConnectionState,
   type RemoteParticipant,
-  type Participant,
 } from "livekit-client";
 import { createLogger } from "@/lib/logger";
 
