@@ -297,7 +297,9 @@ export default async function DashboardPage() {
   ]);
 
   const profile = profileResult.data;
-  const rooms: RoomRow[] = roomsResult.data ?? [];
+  // Supabase infers SelectQueryError into the union under strict mode for select("*").
+  // The runtime value is always RoomRow[] here — cast is safe.
+  const rooms = (roomsResult.data ?? []) as RoomRow[];
 
   const displayName =
     profile?.display_name ??
