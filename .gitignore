@@ -1,3 +1,6 @@
+# ── Accidentally nested duplicate — must never be committed ──────────────────
+/watchhubsync/
+
 # ── Dependencies ─────────────────────────────────────────────────────────────
 /node_modules
 /.pnp
