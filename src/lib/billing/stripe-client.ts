@@ -50,18 +50,19 @@ interface StripeEnv {
   readonly secretKey:                   string;
   readonly webhookSecret:               string;
   readonly pricePremium:                string;
-  readonly meterIdParticipantMinutes:   string;
+  /** Optional at init — only required when pushing participant-minutes meter events. */
+  readonly meterIdParticipantMinutes:   string | undefined;
 }
 
 function resolveStripeEnv(): StripeEnv {
-  const vars = {
-    secretKey:                 process.env["STRIPE_SECRET_KEY"],
-    webhookSecret:             process.env["STRIPE_WEBHOOK_SECRET"],
-    pricePremium:              process.env["STRIPE_PRICE_ID_PREMIUM"],
-    meterIdParticipantMinutes: process.env["STRIPE_METER_ID_PARTICIPANT_MINUTES"],
+  // Core vars required for all Stripe operations.
+  const core = {
+    secretKey:     process.env["STRIPE_SECRET_KEY"],
+    webhookSecret: process.env["STRIPE_WEBHOOK_SECRET"],
+    pricePremium:  process.env["STRIPE_PRICE_ID_PREMIUM"],
   } as const;
 
-  const missing = Object.entries(vars)
+  const missing = Object.entries(core)
     .filter(([, v]) => v === undefined || v.trim().length === 0)
     .map(([k]) => k);
 
@@ -73,10 +74,11 @@ function resolveStripeEnv(): StripeEnv {
   }
 
   return {
-    secretKey:                 vars.secretKey!,
-    webhookSecret:             vars.webhookSecret!,
-    pricePremium:              vars.pricePremium!,
-    meterIdParticipantMinutes: vars.meterIdParticipantMinutes!,
+    secretKey:                 core.secretKey!,
+    webhookSecret:             core.webhookSecret!,
+    pricePremium:              core.pricePremium!,
+    // Presence enforced lazily in pushStripeParticipantMinutes() only.
+    meterIdParticipantMinutes: process.env["STRIPE_METER_ID_PARTICIPANT_MINUTES"],
   };
 }
 
@@ -173,6 +175,13 @@ export async function pushStripeParticipantMinutes(
 
   const stripe = getStripeClient();
   const { meterIdParticipantMinutes } = getStripeEnv();
+
+  if (meterIdParticipantMinutes === undefined || meterIdParticipantMinutes.trim().length === 0) {
+    throw new Error(
+      "Missing STRIPE_METER_ID_PARTICIPANT_MINUTES environment variable. " +
+      "This is required for pushing participant-minutes meter events.",
+    );
+  }
 
   let pushed  = 0;
   let skipped = 0;
