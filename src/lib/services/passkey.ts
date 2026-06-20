@@ -882,7 +882,7 @@ function extractAuthDataFromAttestation(attestationObject: Uint8Array): Uint8Arr
   for (let i = 0; i < attestationObject.length - keyBytes.length; i++) {
     let match = true;
     for (let j = 0; j < keyBytes.length; j++) {
-      if (attestationObject[i + j] !== keyBytes[j]) {
+      if ((attestationObject[i + j] ?? -1) !== (keyBytes[j] ?? -2)) {
         match = false;
         break;
       }

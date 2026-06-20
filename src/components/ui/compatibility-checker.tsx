@@ -217,7 +217,7 @@ function PlatformIcon({
       )}
       aria-hidden="true"
     >
-      {platform.label[0]}
+      {platform.label[0] ?? ""}
     </span>
   );
 }

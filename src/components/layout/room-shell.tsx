@@ -340,8 +340,8 @@ function RemoteLayout({
   roomTitle,
   platform,
 }: {
-  roomTitle?: string;
-  platform?: string;
+  roomTitle?: string | undefined;
+  platform?: string | undefined;
 }) {
   const { slots, syncStatus } = useRoomShell();
 

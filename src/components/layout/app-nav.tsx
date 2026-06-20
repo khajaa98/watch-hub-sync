@@ -66,7 +66,7 @@ export function AppNav({ userId: _userId, displayName, avatarUrl, tier }: AppNav
   const initials = displayName
     ? displayName
         .split(" ")
-        .map((w) => w[0])
+        .map((w) => w[0] ?? "")
         .join("")
         .slice(0, 2)
         .toUpperCase()

@@ -230,7 +230,7 @@ export class YouTubeAdapter extends BaseOTTAdapter {
     this._timeBeforeSeek  = undefined;
     this._wasPausedBeforeSeek = false;
 
-    this._onAttached;   // silence unused-var lint (these are already null)
+    void this._onAttached; // silence unused-var lint (these are already null)
     this._onPlayBound   = null;
     this._onPauseBound  = null;
     this._onSeekedBound = null;
