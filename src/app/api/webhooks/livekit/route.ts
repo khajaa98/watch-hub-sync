@@ -47,7 +47,6 @@ import {
   type SubscriptionTier,
 } from "@/lib/billing/meter-calculator";
 import { pushStripeParticipantMinutes } from "@/lib/billing/stripe-client";
-import type Stripe from "stripe";
 import type { RoomRow, UserRow, BillingMeterRow } from "@/types/supabase";
 
 // ---------------------------------------------------------------------------
