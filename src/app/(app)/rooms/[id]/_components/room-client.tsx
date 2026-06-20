@@ -17,7 +17,7 @@ import {
   useDataChannel,
   useConnectionState,
 } from "@livekit/components-react";
-import { ConnectionState, type DataPacket_Kind } from "livekit-client";
+import { ConnectionState } from "livekit-client";
 import {
   Copy,
   Check,
