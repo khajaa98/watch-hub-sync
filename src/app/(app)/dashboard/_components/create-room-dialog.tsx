@@ -285,8 +285,18 @@ export function CreateRoomDialog({ onClose, onCreated }: CreateRoomDialogProps) 
         });
 
         if (!res.ok) {
-          const body = (await res.json()) as { error?: string };
-          throw new Error(body.error ?? `Request failed: ${res.status}`);
+          const text = await res.text();
+          console.error("[WHS] POST /api/rooms failed:", res.status, text.slice(0, 500));
+          let message = `Request failed (${res.status})`;
+          try {
+            const body = JSON.parse(text) as { error?: string };
+            if (typeof body.error === "string" && body.error.length > 0) {
+              message = body.error;
+            }
+          } catch {
+            // HTML error page — message stays as status code
+          }
+          throw new Error(message);
         }
 
         const data = (await res.json()) as CreatedRoom;
@@ -338,7 +348,7 @@ export function CreateRoomDialog({ onClose, onCreated }: CreateRoomDialogProps) 
           "rounded-2xl bg-surface shadow-modal",
           "ring-1 ring-inset ring-white/[0.07]",
           "flex flex-col overflow-hidden",
-          "max-h-[90dvh]",
+          "max-h-[85dvh] sm:max-h-[80dvh]",
         )}
       >
         {/* Header */}

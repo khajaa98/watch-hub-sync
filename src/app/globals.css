@@ -1,3 +1,4 @@
+/* whs:v3 — cache-bust: forces PostCSS+Tailwind recompile on Vercel */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -244,8 +245,4 @@
     user-select: none;
   }
 
-  /* Prevent overscroll bounce on fixed overlays */
-  .overscroll-none {
-    overscroll-behavior: none;
-  }
-}
+  /* Prevent overscroll bounce on fix
