@@ -245,4 +245,8 @@
     user-select: none;
   }
 
-  /* Prevent overscroll bounce on fix
+  /* Prevent overscroll bounce on fixed overlays */
+  .overscroll-none {
+    overscroll-behavior: none;
+  }
+}
