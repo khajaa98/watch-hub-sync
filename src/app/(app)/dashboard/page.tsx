@@ -218,20 +218,22 @@ function StatRow({
       label: "Active rooms",
       value: activeCount,
       icon: Tv2,
+      badge: undefined,
     },
     {
       label: "Total sessions",
       value: totalCount,
       icon: Clock,
+      badge: undefined,
     },
     {
       label: "Plan",
       value:
         profile?.subscription_tier === "premium" ? "Premium" : "Free",
       icon: Crown,
-      badge: profile?.subscription_tier === "premium" ? "premium" as const : undefined,
+      badge: profile?.subscription_tier === "premium" ? ("premium" as const) : undefined,
     },
-  ] as const;
+  ];
 
   return (
     <div className="grid grid-cols-3 gap-3">
