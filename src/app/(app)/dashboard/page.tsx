@@ -296,10 +296,8 @@ export default async function DashboardPage() {
       .limit(30),
   ]);
 
-  // Supabase infers SelectQueryError into the union for partial selects under strict mode.
-  // Both casts are safe — the runtime values are always UserRow | null and RoomRow[].
-  const profile = profileResult.data as unknown as UserRow | null;
-  const rooms = (roomsResult.data ?? []) as unknown as RoomRow[];
+  const profile = profileResult.data;
+  const rooms = roomsResult.data ?? [];
 
   const displayName =
     profile?.display_name ??

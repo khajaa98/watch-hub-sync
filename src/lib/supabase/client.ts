@@ -36,7 +36,7 @@ import type { Database } from "@/types/supabase";
 // Types
 // ---------------------------------------------------------------------------
 
-export type TypedSupabaseClient = SupabaseClient<Database>;
+export type TypedSupabaseClient = SupabaseClient<Database, "public">;
 
 // ---------------------------------------------------------------------------
 // Singleton management
@@ -75,7 +75,7 @@ export function getSupabaseBrowserClient(): TypedSupabaseClient {
     );
   }
 
-  browserClientInstance = createBrowserClient<Database>(
+  browserClientInstance = createBrowserClient<Database, "public">(
     supabaseUrl,
     supabaseAnonKey,
     {

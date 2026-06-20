@@ -75,7 +75,7 @@ function getServiceRoleKey(): string {
 export function createSupabaseServerComponentClient() {
   const cookieStore = cookies();
 
-  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  return createServerClient<Database, "public">(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -110,7 +110,7 @@ export function createSupabaseServerComponentClient() {
 export function createSupabaseRouteHandlerClient() {
   const cookieStore = cookies();
 
-  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  return createServerClient<Database, "public">(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -157,7 +157,7 @@ export function createSupabaseRouteHandlerClient() {
  * await supabase.from('billing_meters').insert({ ... })
  */
 export function createSupabaseServiceClient() {
-  return createClient<Database>(SUPABASE_URL, getServiceRoleKey(), {
+  return createClient<Database, "public">(SUPABASE_URL, getServiceRoleKey(), {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
