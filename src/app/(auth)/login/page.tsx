@@ -35,6 +35,7 @@ import {
   useEffect,
   useTransition,
   useId,
+  Suspense,
   type FormEvent,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -339,7 +340,7 @@ function LoginForm({
 // Page
 // ---------------------------------------------------------------------------
 
-export default function LoginPage() {
+function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const formId = useId();
@@ -582,5 +583,13 @@ export default function LoginPage() {
         </a>
       </p>
     </div>
+  );
+}
+
+export default function LoginPageWrapper() {
+  return (
+    <Suspense>
+      <LoginPage />
+    </Suspense>
   );
 }
