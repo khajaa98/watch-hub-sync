@@ -34,7 +34,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { jwtVerify, type JWTPayload } from "jose";
 import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
@@ -256,22 +256,20 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
   const supabase = createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      getAll() {
-        return request.cookies.getAll();
+      get(name: string) {
+        return request.cookies.get(name)?.value;
       },
-      setAll(cookiesToSet) {
-        // First, apply the cookies to the cloned request (Supabase internal requirement).
-        cookiesToSet.forEach(({ name, value }) => {
-          request.cookies.set(name, value);
-        });
-
-        // Rebuild the response with the mutated request so Next.js propagates cookies.
+      set(name: string, value: string, options: CookieOptions) {
+        // Apply to the cloned request (Supabase internal requirement).
+        request.cookies.set(name, value);
+        // Rebuild response so Next.js propagates the updated request cookies.
         supabaseResponse = NextResponse.next({ request });
-
-        // Write the refreshed auth cookies to the response.
-        cookiesToSet.forEach(({ name, value, options }) => {
-          supabaseResponse.cookies.set(name, value, options);
-        });
+        supabaseResponse.cookies.set(name, value, options);
+      },
+      remove(name: string, options: CookieOptions) {
+        request.cookies.delete(name);
+        supabaseResponse = NextResponse.next({ request });
+        supabaseResponse.cookies.set(name, "", options);
       },
     },
   });

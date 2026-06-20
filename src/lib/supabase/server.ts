@@ -77,13 +77,13 @@ export function createSupabaseServerComponentClient() {
 
   return createServerClient<Database, "public">(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll();
+      get(name: string) {
+        return cookieStore.get(name)?.value;
       },
-      setAll(_cookiesToSet) {
-        // Intentionally a no-op in RSC context.
-        // Session refresh is handled by src/middleware.ts.
-      },
+      // set/remove are intentional no-ops in RSC context.
+      // Session refresh is handled by src/middleware.ts.
+      set(_name: string, _value: string, _options: CookieOptions) {},
+      remove(_name: string, _options: CookieOptions) {},
     },
   });
 }
@@ -112,23 +112,14 @@ export function createSupabaseRouteHandlerClient() {
 
   return createServerClient<Database, "public">(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
-      getAll() {
-        return cookieStore.getAll();
+      get(name: string) {
+        return cookieStore.get(name)?.value;
       },
-      setAll(cookiesToSet) {
-        cookiesToSet.forEach(
-          ({
-            name,
-            value,
-            options,
-          }: {
-            name: string;
-            value: string;
-            options: CookieOptions;
-          }) => {
-            cookieStore.set(name, value, options);
-          },
-        );
+      set(name: string, value: string, options: CookieOptions) {
+        cookieStore.set({ name, value, ...options });
+      },
+      remove(name: string, options: CookieOptions) {
+        cookieStore.set({ name, value: "", ...options });
       },
     },
   });
