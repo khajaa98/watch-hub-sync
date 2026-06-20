@@ -379,7 +379,7 @@ export function CreateRoomDialog({ onClose, onCreated }: CreateRoomDialogProps) 
         </div>
 
         {/* Step content — scrollable */}
-        <div className="flex-1 overflow-y-auto px-5 py-5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
           <AnimatePresence mode="wait" initial={false}>
 
             {/* ── Step 1: Platform ─────────────────────────────────────── */}
