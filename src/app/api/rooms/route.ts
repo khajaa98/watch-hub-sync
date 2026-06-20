@@ -27,7 +27,7 @@ import {
   AuthRequiredError,
 } from "@/lib/supabase/server";
 import { randomHex } from "@/lib/utils";
-import type { Platform } from "@/types/supabase";
+import type { Platform, Json } from "@/types/supabase";
 
 // ---------------------------------------------------------------------------
 // Runtime config
@@ -153,7 +153,7 @@ export async function POST(
       livekit_room_name: livekitRoomName,
       invite_token_hash: tokenHash,
       invite_expires_at: inviteExpiresAt,
-      settings: settings as Record<string, unknown>,
+      settings: settings as unknown as Json,
     })
     .select("id, livekit_room_name")
     .single();
