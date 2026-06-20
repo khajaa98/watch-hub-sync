@@ -114,10 +114,12 @@ export async function POST(
   const cancelUrl  = `${appUrl}/billing?checkout=cancelled`;
 
   // ── 4. Create Stripe Checkout Session ────────────────────────────────────
-  const stripe       = getStripeClient();
-  const { pricePremium } = getStripeEnv();
-
   try {
+    // getStripeClient/getStripeEnv throw if env vars are missing — keep inside
+    // the try so we can catch and return a diagnostic 500 (not an unhandled crash).
+    const stripe           = getStripeClient();
+    const { pricePremium } = getStripeEnv();
+
     // Build params mutably to avoid conditional spread creating a union type
     // that confuses TypeScript's overload resolution on sessions.create().
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
@@ -195,9 +197,12 @@ export async function POST(
       },
     );
   } catch (err) {
-    log.error({ err, userId }, "Stripe Checkout Session creation failed");
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error({ err, userId, errMsg }, "Stripe Checkout Session creation failed");
+    // Include the real error message in the response so it shows in the UI
+    // and helps diagnose — strip before go-live if preferred.
     return NextResponse.json<ErrorResponse>(
-      { error: "Failed to initialise checkout. Please try again." },
+      { error: `Checkout error: ${errMsg}` },
       { status: 500 },
     );
   }
