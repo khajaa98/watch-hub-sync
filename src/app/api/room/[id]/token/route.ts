@@ -158,6 +158,13 @@ export async function GET(
     );
   }
 
+  if (room.livekit_room_name === null) {
+    return NextResponse.json<ErrorResponseBody>(
+      { error: "Room is not ready", code: "ROOM_NOT_READY" },
+      { status: 503 },
+    );
+  }
+
   if (room.status === "closed") {
     return NextResponse.json<ErrorResponseBody>(
       { error: "This room has ended", code: "ROOM_CLOSED" },
