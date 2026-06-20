@@ -83,7 +83,7 @@ function RoomUI({
   isHost,
   inviteUrl,
   userId,
-  displayName,
+  displayName: _displayName,
 }: Omit<RoomClientProps, "roomId">) {
   const router            = useRouter();
   const connectionState   = useConnectionState();
