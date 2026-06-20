@@ -123,6 +123,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         );
         break;
 
+      case "checkout.session.completed":
+        await handleCheckoutSessionCompleted(
+          stripeEvent.data.object as Stripe.Checkout.Session,
+          eventId,
+        );
+        break;
+
       default:
         log.debug({ eventType }, "Stripe event type not handled — ignoring");
     }
@@ -365,6 +372,92 @@ async function handleInvoicePaymentSucceeded(
     },
     "Invoice paid — billing meters marked processed",
   );
+}
+
+// ---------------------------------------------------------------------------
+// checkout.session.completed handler
+// ---------------------------------------------------------------------------
+
+async function handleCheckoutSessionCompleted(
+  session: Stripe.Checkout.Session,
+  eventId: string,
+): Promise<void> {
+  // client_reference_id must be set to the Supabase user ID when creating
+  // the Checkout Session on your server (e.g. in /api/billing/checkout).
+  const userId = session.client_reference_id;
+
+  if (userId === null || userId.trim().length === 0) {
+    log.error(
+      { sessionId: session.id, eventId },
+      "checkout.session.completed missing client_reference_id — cannot attribute purchase",
+    );
+    return;
+  }
+
+  const mode = session.mode; // "payment" | "subscription" | "setup"
+
+  // ── Subscription checkout (recurring billing) ──────────────────────────
+  // If this session was for a subscription, Stripe also fires
+  // customer.subscription.created which handles the tier upgrade.
+  // We just ensure the stripe_customer_id is synced here.
+  if (mode === "subscription") {
+    const customerId =
+      typeof session.customer === "string"
+        ? session.customer
+        : (session.customer as Stripe.Customer | null)?.id ?? null;
+
+    if (customerId !== null) {
+      const supabase = createSupabaseServiceClient();
+      const { error } = await supabase
+        .from("users")
+        .update({ stripe_customer_id: customerId })
+        .eq("id", userId)
+        .is("stripe_customer_id", null); // Only set if not already linked
+
+      if (error !== null) {
+        log.error({ error, userId, customerId, eventId }, "Failed to link stripe_customer_id");
+      } else {
+        log.info({ userId, customerId, eventId }, "Stripe customer linked from checkout");
+      }
+    }
+    return;
+  }
+
+  // ── One-time payment checkout (e.g. credit top-up) ────────────────────
+  if (mode === "payment") {
+    const amountTotal = session.amount_total ?? 0; // cents / pence
+    const currency    = session.currency ?? "gbp";
+
+    log.info(
+      { sessionId: session.id, userId, amountTotal, currency, eventId },
+      "One-time checkout completed",
+    );
+
+    // If you have a credits/wallet system, increment it here.
+    // Example (uncomment and adapt to your schema):
+    //
+    // const supabase = createSupabaseServiceClient();
+    // await supabase.rpc("increment_user_credits", {
+    //   p_user_id: userId,
+    //   p_amount:  amountTotal,
+    // });
+
+    // For now: upgrade user to premium on successful one-time payment.
+    const supabase = createSupabaseServiceClient();
+    const { error } = await supabase
+      .from("users")
+      .update({ subscription_tier: "premium" })
+      .eq("id", userId);
+
+    if (error !== null) {
+      throw new Error(`Failed to upgrade user after checkout: ${error.message}`);
+    }
+
+    log.info(
+      { userId, amountTotal, currency, eventId },
+      "User upgraded to premium via one-time checkout",
+    );
+  }
 }
 
 function handleInvoicePaymentFailed(
