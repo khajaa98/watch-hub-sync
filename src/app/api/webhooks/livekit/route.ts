@@ -307,15 +307,19 @@ async function handleParticipantLeft(
     .from("billing_meters")
     .upsert(
       {
-        room_id:           dbRoom.id,
-        user_id:           userId,
-        livekit_event_id:  eventId,
-        session_start_at:  sessionStartAt.toISOString(),
-        session_end_at:    sessionEndAt.toISOString(),
-        participant_minutes: billableMinutes,
-        chargeable_minutes:  chargeableMinutes,
-        is_processed:      false,
-        is_anomalous:      isAnomalous,
+        room_id:              dbRoom.id,
+        host_id:              dbRoom.host_id,
+        livekit_event_id:     eventId,
+        billing_period_start: sessionStartAt.toISOString(),
+        billing_period_end:   sessionEndAt.toISOString(),
+        participant_minutes:  billableMinutes,
+        is_processed:         false,
+        // chargeable_minutes and is_anomalous stored in session_breakdown for audit
+        session_breakdown: {
+          user_id:            userId,
+          chargeable_minutes: chargeableMinutes,
+          is_anomalous:       isAnomalous,
+        },
       },
       {
         onConflict:       "livekit_event_id",
@@ -436,20 +440,18 @@ async function handleRoomFinished(
 
   type UnprocessedMeter = {
     id: string;
-    user_id: string;
-    chargeable_minutes: number;
-    session_end_at: string;
+    billing_period_end: string;
+    session_breakdown: { user_id?: string; chargeable_minutes?: number } | null;
     users: { stripe_customer_id: string | null } | null;
   };
 
   const { data: unprocessedMetersRaw } = await supabase
     .from("billing_meters")
     .select(
-      "id, user_id, chargeable_minutes, session_end_at, users(stripe_customer_id)",
+      "id, billing_period_end, session_breakdown, users(stripe_customer_id)",
     )
     .eq("room_id", dbRoom.id)
-    .eq("is_processed", false)
-    .gt("chargeable_minutes", 0);
+    .eq("is_processed", false);
   const unprocessedMeters = unprocessedMetersRaw as unknown as UnprocessedMeter[] | null;
 
   if (unprocessedMeters === null || unprocessedMeters.length === 0) {
@@ -458,12 +460,16 @@ async function handleRoomFinished(
   }
 
   const stripePushEvents = unprocessedMeters
-    .filter((m) => m.users?.stripe_customer_id != null)
+    .filter((m) => {
+      const hasCustomer = m.users?.stripe_customer_id != null;
+      const chargeableMinutes = (m.session_breakdown?.chargeable_minutes ?? 0);
+      return hasCustomer && chargeableMinutes > 0;
+    })
     .map((m) => ({
       billingMeterId:     m.id,
       stripeCustomerId:   m.users!.stripe_customer_id as string,
-      participantMinutes: m.chargeable_minutes,
-      sessionEndAt:       new Date(m.session_end_at),
+      participantMinutes: m.session_breakdown?.chargeable_minutes ?? 0,
+      sessionEndAt:       new Date(m.billing_period_end),
     }));
 
   if (stripePushEvents.length === 0) {
