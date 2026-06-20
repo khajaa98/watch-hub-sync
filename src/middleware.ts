@@ -40,7 +40,9 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 import type { Database, SupabaseJWTPayload } from "@/types/supabase";
 
-export const runtime = "edge";
+// Middleware always runs on the Edge Runtime in Next.js — no runtime export needed.
+// Adding `export const runtime = "edge"` here causes Next.js to treat the file
+// as a page and throw "experimental edge runtime" errors at build time.
 
 // ---------------------------------------------------------------------------
 // Route matchers
