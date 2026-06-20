@@ -98,19 +98,10 @@ CREATE POLICY "rooms: host read own"
   FOR SELECT
   USING (auth.uid() = host_id);
 
--- POLICY: Participants (guests) can read rooms they are in.
--- Sub-select into participants; avoids a JOIN in the policy itself.
-CREATE POLICY "rooms: participant read"
-  ON public.rooms
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1
-      FROM public.participants p
-      WHERE p.room_id = public.rooms.id
-        AND p.user_id = auth.uid()
-    )
-  );
+-- NOTE: "rooms: participant read" policy is intentionally absent here.
+-- It references public.participants, which does not exist until
+-- 00004_create_participants.sql. The policy is created at the end of
+-- 00004 after the participants table is fully established.
 
 -- POLICY: Only the host may create a room with themselves as host_id.
 CREATE POLICY "rooms: host insert"

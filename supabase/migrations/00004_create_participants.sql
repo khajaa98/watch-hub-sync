@@ -118,4 +118,22 @@ CREATE POLICY "participants: deny delete"
   FOR DELETE
   USING (FALSE);
 
+-- ---------------------------------------------------------------------------
+-- Back-fill: rooms policy that references public.participants
+-- This policy belongs logically to the rooms table but could not be created
+-- in 00003_create_rooms.sql because participants did not exist yet.
+-- PostgreSQL validates sub-select relation references at CREATE POLICY time.
+-- ---------------------------------------------------------------------------
+CREATE POLICY "rooms: participant read"
+  ON public.rooms
+  FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1
+      FROM public.participants p
+      WHERE p.room_id = public.rooms.id
+        AND p.user_id = auth.uid()
+    )
+  );
+
 COMMIT;
