@@ -415,7 +415,10 @@ async function handleRoomFinished(
   // ── Mark room as closed ──────────────────────────────────────────────────
   const { error: updateError } = await supabase
     .from("rooms")
-    .update({ status: "closed" })
+    .update({
+      status:    "closed",
+      closed_at: new Date().toISOString(),
+    })
     .eq("livekit_room_name", room.name ?? "")
     .neq("status", "closed"); // No-op if already closed (idempotent)
 
