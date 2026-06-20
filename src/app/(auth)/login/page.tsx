@@ -1,10 +1,13 @@
 /**
  * src/app/(auth)/login/page.tsx
  *
- * WatchHubSync — Cinematic Authentication Interface.
+ * WatchHubSync — Cinematic Authentication Card.
+ *
+ * The outer page shell (background, logo, footer, centering) is handled by
+ * src/app/(auth)/layout.tsx — this component renders only the card content.
  *
  * Two sign-in paths:
- *   1. Email Magic Link (OTP / PKCE) → /api/auth/callback
+ *   1. Email Magic Link (PKCE) → /api/auth/callback
  *   2. FIDO Passkey → navigator.credentials.get()
  */
 
@@ -29,8 +32,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { absoluteUrl } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { absoluteUrl, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 // ---------------------------------------------------------------------------
@@ -67,32 +69,32 @@ function SentPanel({ email, onRetry }: { email: string; onRetry: () => void }) {
       initial="enter"
       animate="center"
       exit="exit"
-      className="flex flex-col items-center gap-6 py-2 text-center"
+      className="flex flex-col items-center gap-6 py-4 text-center"
     >
       <motion.div
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.1, ...SPRING }}
-        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20"
+        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-ok/10 ring-1 ring-ok/20"
       >
-        <CheckCircle2 className="h-7 w-7 text-emerald-400" />
-        <span className="absolute inset-0 animate-ping rounded-full ring-2 ring-emerald-500/20 [animation-duration:2s]" />
+        <CheckCircle2 className="h-7 w-7 text-ok" />
+        <span className="absolute inset-0 animate-ping rounded-full ring-2 ring-ok/20 [animation-duration:2s]" />
       </motion.div>
 
       <div className="space-y-2">
         <h2 className="text-base font-semibold text-white">Check your inbox</h2>
-        <p className="text-sm text-zinc-400">We sent a sign-in link to</p>
-        <p className="rounded-lg bg-zinc-800/80 px-4 py-2 text-sm font-medium text-white ring-1 ring-inset ring-white/[0.08]">
+        <p className="text-sm text-neutral-400">We sent a sign-in link to</p>
+        <p className="rounded-lg bg-surface-raised px-4 py-2 text-sm font-medium text-white ring-1 ring-inset ring-white/[0.08]">
           {email}
         </p>
-        <p className="text-xs text-zinc-600">
+        <p className="text-xs text-neutral-600">
           Link expires in 60 minutes · check spam if you don't see it
         </p>
       </div>
 
       <button
         onClick={onRetry}
-        className="text-xs text-zinc-600 underline underline-offset-2 transition-colors hover:text-zinc-300"
+        className="text-xs text-neutral-600 underline underline-offset-2 transition-colors hover:text-neutral-300"
       >
         Try a different email
       </button>
@@ -107,20 +109,20 @@ function PasskeyPendingPanel() {
       initial="enter"
       animate="center"
       exit="exit"
-      className="flex flex-col items-center gap-6 py-2 text-center"
+      className="flex flex-col items-center gap-6 py-4 text-center"
     >
-      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/10 ring-1 ring-violet-500/20">
+      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
         <motion.div
           animate={{ scale: [1, 1.1, 1] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Fingerprint className="h-7 w-7 text-violet-400" />
+          <Fingerprint className="h-7 w-7 text-accent" />
         </motion.div>
-        <span className="absolute inset-0 animate-ping rounded-full ring-2 ring-violet-500/20 [animation-duration:2s]" />
+        <span className="absolute inset-0 animate-pulse-ring rounded-full" />
       </div>
       <div className="space-y-1.5">
         <h2 className="text-base font-semibold text-white">Verifying passkey</h2>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-neutral-400">
           Follow the prompt — Touch ID, Face ID, or Windows Hello
         </p>
       </div>
@@ -156,12 +158,7 @@ function LoginForm({
   );
 
   return (
-    <motion.div
-      variants={panelVariants}
-      initial="enter"
-      animate="center"
-      exit="exit"
-    >
+    <motion.div variants={panelVariants} initial="enter" animate="center" exit="exit">
       <form
         id={formId}
         onSubmit={handleSubmit}
@@ -169,16 +166,15 @@ function LoginForm({
         noValidate
         aria-label="Sign in with email"
       >
-        {/* Email field */}
         <div className="space-y-2">
           <label
             htmlFor={`${formId}-email`}
-            className="block text-xs font-medium text-zinc-400"
+            className="block text-xs font-medium text-neutral-400"
           >
             Email address
           </label>
           <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+            <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-600" />
             <input
               id={`${formId}-email`}
               type="email"
@@ -190,10 +186,10 @@ function LoginForm({
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
               className={cn(
-                "w-full rounded-xl bg-zinc-800/60 py-3 pl-10 pr-4 text-sm text-white",
+                "w-full rounded-xl bg-surface-raised py-3 pl-10 pr-4 text-sm text-white",
                 "ring-1 ring-inset ring-white/[0.08]",
-                "placeholder:text-zinc-600",
-                "focus:outline-none focus:ring-2 focus:ring-violet-500/50",
+                "placeholder:text-neutral-700",
+                "focus:outline-none focus:ring-2 focus:ring-accent/50",
                 "disabled:cursor-not-allowed disabled:opacity-50",
                 "transition-all duration-150",
               )}
@@ -203,7 +199,6 @@ function LoginForm({
           </div>
         </div>
 
-        {/* Error message */}
         <AnimatePresence>
           {errorMessage !== null && (
             <motion.div
@@ -216,7 +211,7 @@ function LoginForm({
               aria-live="assertive"
               className="overflow-hidden"
             >
-              <div className="flex items-start gap-2 rounded-xl bg-red-500/10 px-3.5 py-3 text-xs text-red-400 ring-1 ring-inset ring-red-500/20">
+              <div className="flex items-start gap-2 rounded-xl bg-danger/10 px-3.5 py-3 text-xs text-danger ring-1 ring-inset ring-danger/20">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {errorMessage}
               </div>
@@ -224,7 +219,6 @@ function LoginForm({
           )}
         </AnimatePresence>
 
-        {/* Primary CTA */}
         <Button
           type="submit"
           size="lg"
@@ -237,25 +231,18 @@ function LoginForm({
         </Button>
       </form>
 
-      {/* Passkey divider + button */}
       {hasPasskeySupport && (
         <>
-          <div className="relative my-5">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/[0.06]" />
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-zinc-900 px-3 text-xs text-zinc-600">or</span>
-            </div>
+          <div className="divider-label my-5">
+            <span>or</span>
           </div>
-
           <Button
             variant="secondary"
             size="lg"
             onClick={onPasskey}
             isLoading={isLoading && step.id === "loading" && step.method === "passkey"}
             disabled={isLoading}
-            leftIcon={<Fingerprint className="h-4 w-4 text-violet-400" />}
+            leftIcon={<Fingerprint className="h-4 w-4 text-accent" />}
             className="w-full"
             aria-label="Sign in with your saved passkey"
           >
@@ -268,35 +255,35 @@ function LoginForm({
 }
 
 // ---------------------------------------------------------------------------
-// Page inner (uses useSearchParams — must be inside <Suspense>)
+// Page inner — needs Suspense because of useSearchParams
 // ---------------------------------------------------------------------------
 
 function LoginPageInner() {
-  const router = useRouter();
+  const router       = useRouter();
   const searchParams = useSearchParams();
-  const formId = useId();
+  const formId       = useId();
   const [, startTransition] = useTransition();
 
-  const [authStep, setAuthStep] = useState<AuthStep>({ id: "idle" });
+  const [authStep, setAuthStep]           = useState<AuthStep>({ id: "idle" });
   const [hasPasskeySupport, setHasPasskeySupport] = useState(false);
 
-  // Auth error from callback redirect
-  const authError = searchParams.get("error");
+  const authError  = searchParams.get("error");
+  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
 
   // Passkey platform detection
   useEffect(() => {
     if (
       typeof window === "undefined" ||
       typeof window.PublicKeyCredential === "undefined" ||
-      typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== "function"
+      typeof window.PublicKeyCredential
+        .isUserVerifyingPlatformAuthenticatorAvailable !== "function"
     ) return;
 
-    window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+    window.PublicKeyCredential
+      .isUserVerifyingPlatformAuthenticatorAvailable()
       .then((ok) => setHasPasskeySupport(ok))
       .catch(() => setHasPasskeySupport(false));
   }, []);
-
-  const redirectTo = searchParams.get("redirect") ?? "/dashboard";
 
   // ── Magic link ────────────────────────────────────────────────────────────
   const handleMagicLink = useCallback(
@@ -352,7 +339,9 @@ function LoginPageInner() {
               options.challenge instanceof ArrayBuffer
                 ? options.challenge
                 : Uint8Array.from(
-                    Object.values(options.challenge as unknown as Record<string, number>),
+                    Object.values(
+                      options.challenge as unknown as Record<string, number>,
+                    ),
                   ),
           },
         });
@@ -370,17 +359,20 @@ function LoginPageInner() {
               response: {
                 clientDataJSON: Array.from(
                   new Uint8Array(
-                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse).clientDataJSON,
+                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse)
+                      .clientDataJSON,
                   ),
                 ),
                 authenticatorData: Array.from(
                   new Uint8Array(
-                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse).authenticatorData,
+                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse)
+                      .authenticatorData,
                   ),
                 ),
                 signature: Array.from(
                   new Uint8Array(
-                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse).signature,
+                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse)
+                      .signature,
                   ),
                 ),
               },
@@ -396,8 +388,12 @@ function LoginPageInner() {
         router.push(redirectTo);
         router.refresh();
       } catch (err) {
-        const isUserCancelled = err instanceof DOMException && err.name === "NotAllowedError";
-        if (isUserCancelled) { setAuthStep({ id: "idle" }); return; }
+        const isUserCancelled =
+          err instanceof DOMException && err.name === "NotAllowedError";
+        if (isUserCancelled) {
+          setAuthStep({ id: "idle" });
+          return;
+        }
         setAuthStep({
           id: "error",
           method: "passkey",
@@ -410,102 +406,52 @@ function LoginPageInner() {
     });
   }, [router, redirectTo]);
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-4 py-12">
-      {/* Ambient glow */}
-      <div
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-        aria-hidden="true"
-      >
-        <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/10 blur-[120px]" />
+    <div className="glass rounded-2xl px-6 py-8 shadow-modal">
+      {/* Callback auth error (e.g. expired magic link) */}
+      {authError === "auth-failed" && (
+        <div className="mb-5 flex items-start gap-2 rounded-xl bg-danger/10 px-3.5 py-3 text-xs text-danger ring-1 ring-inset ring-danger/20">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Sign-in link expired or already used. Please request a new one.
+        </div>
+      )}
+
+      {/* Card header */}
+      <div className="mb-6">
+        <h1 className="text-base font-semibold text-white">Sign in</h1>
+        <p className="mt-1 text-sm text-neutral-500">
+          Enter your email to receive a magic link
+        </p>
       </div>
 
-      {/* Logo mark */}
-      <div className="relative mb-8 flex flex-col items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/10 ring-1 ring-inset ring-violet-500/20">
-          <span className="text-lg font-bold tracking-tighter text-violet-400">W</span>
-        </div>
-        <div className="text-center">
-          <h1 className="text-lg font-semibold tracking-tight text-white">
-            Watch Hub Sync
-          </h1>
-          <p className="text-sm text-zinc-500">Cinema, together.</p>
-        </div>
-      </div>
-
-      {/* Glass card */}
-      <div className="relative w-full max-w-sm">
-        {/* Card glow border */}
-        <div
-          className="pointer-events-none absolute -inset-px rounded-2xl"
-          style={{
-            background:
-              "linear-gradient(145deg, rgba(139,92,246,0.15), rgba(255,255,255,0.03) 60%)",
-          }}
-          aria-hidden="true"
-        />
-        <div className="relative rounded-2xl bg-zinc-900/80 px-6 py-8 shadow-2xl ring-1 ring-inset ring-white/[0.06] backdrop-blur-xl">
-          {/* Callback auth error */}
-          {authError === "auth-failed" && (
-            <div className="mb-5 flex items-start gap-2 rounded-xl bg-red-500/10 px-3.5 py-3 text-xs text-red-400 ring-1 ring-inset ring-red-500/20">
-              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Sign-in link expired or already used. Please request a new one.
-            </div>
+      {/* Animated content area */}
+      <div className="min-h-[180px]">
+        <AnimatePresence mode="wait" initial={false}>
+          {(authStep.id === "idle" ||
+            authStep.id === "loading" ||
+            authStep.id === "error") && (
+            <LoginForm
+              key="form"
+              step={authStep}
+              onMagicLink={handleMagicLink}
+              onPasskey={handlePasskey}
+              hasPasskeySupport={hasPasskeySupport}
+              formId={formId}
+            />
           )}
-
-          <div className="mb-6">
-            <h2 className="text-base font-semibold text-white">Sign in</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Enter your email to receive a magic link
-            </p>
-          </div>
-
-          <div className="min-h-[180px]">
-            <AnimatePresence mode="wait" initial={false}>
-              {(authStep.id === "idle" ||
-                authStep.id === "loading" ||
-                authStep.id === "error") && (
-                <LoginForm
-                  key="form"
-                  step={authStep}
-                  onMagicLink={handleMagicLink}
-                  onPasskey={handlePasskey}
-                  hasPasskeySupport={hasPasskeySupport}
-                  formId={formId}
-                />
-              )}
-              {authStep.id === "sent" && (
-                <SentPanel
-                  key="sent"
-                  email={authStep.email}
-                  onRetry={() => setAuthStep({ id: "idle" })}
-                />
-              )}
-              {authStep.id === "passkey-pending" && (
-                <PasskeyPendingPanel key="passkey" />
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
+          {authStep.id === "sent" && (
+            <SentPanel
+              key="sent"
+              email={authStep.email}
+              onRetry={() => setAuthStep({ id: "idle" })}
+            />
+          )}
+          {authStep.id === "passkey-pending" && (
+            <PasskeyPendingPanel key="passkey" />
+          )}
+        </AnimatePresence>
       </div>
-
-      <p className="relative mt-6 text-xs text-zinc-700">
-        By signing in you agree to our{" "}
-        <a
-          href="/terms"
-          className="text-zinc-600 underline underline-offset-2 transition-colors hover:text-zinc-400"
-        >
-          Terms
-        </a>{" "}
-        and{" "}
-        <a
-          href="/privacy"
-          className="text-zinc-600 underline underline-offset-2 transition-colors hover:text-zinc-400"
-        >
-          Privacy Policy
-        </a>
-        .
-      </p>
     </div>
   );
 }
