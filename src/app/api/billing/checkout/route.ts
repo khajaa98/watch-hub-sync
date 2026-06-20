@@ -197,12 +197,9 @@ export async function POST(
       },
     );
   } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    log.error({ err, userId, errMsg }, "Stripe Checkout Session creation failed");
-    // Include the real error message in the response so it shows in the UI
-    // and helps diagnose — strip before go-live if preferred.
+    log.error({ err, userId }, "Stripe Checkout Session creation failed");
     return NextResponse.json<ErrorResponse>(
-      { error: `Checkout error: ${errMsg}` },
+      { error: "Failed to initialise checkout. Please try again." },
       { status: 500 },
     );
   }
