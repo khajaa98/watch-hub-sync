@@ -45,7 +45,6 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   Sparkles,
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";

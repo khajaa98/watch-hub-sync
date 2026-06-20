@@ -20,10 +20,8 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus,
   Crown,
   Clock,
-  Users,
   Tv2,
   ChevronRight,
   Sparkles,

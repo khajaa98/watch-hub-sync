@@ -33,10 +33,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type Stripe from "stripe";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
-import {
-  getStripeClient,
-  constructStripeEvent,
-} from "@/lib/billing/stripe-client";
+import { constructStripeEvent } from "@/lib/billing/stripe-client";
 import { createLogger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------

@@ -62,7 +62,6 @@ import {
   Room,
   RoomEvent,
   ConnectionState,
-  DataPacket_Kind,
   type RemoteParticipant,
   type Participant,
 } from "livekit-client";

@@ -46,10 +46,7 @@ import {
   applyTierPolicy,
   type SubscriptionTier,
 } from "@/lib/billing/meter-calculator";
-import {
-  getStripeClient,
-  pushStripeParticipantMinutes,
-} from "@/lib/billing/stripe-client";
+import { pushStripeParticipantMinutes } from "@/lib/billing/stripe-client";
 import type Stripe from "stripe";
 
 // ---------------------------------------------------------------------------

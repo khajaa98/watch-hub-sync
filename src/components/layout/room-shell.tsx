@@ -53,16 +53,12 @@ import {
 } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Wifi,
   WifiOff,
   Users,
   MessageSquare,
   Radio,
-  ChevronLeft,
   Maximize2,
   Minimize2,
-  Volume2,
-  VolumeX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
