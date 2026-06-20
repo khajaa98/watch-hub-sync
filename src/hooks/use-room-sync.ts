@@ -225,7 +225,7 @@ export function useRoomSync({
   roomId,
   onSyncEvent,
   maxRetries = MAX_RETRIES_DEFAULT,
-  isHost = false,
+  isHost: _isHost = false,
 }: UseRoomSyncOptions): UseRoomSyncReturn {
   // ── State ────────────────────────────────────────────────────────────────
   const [connectionState, setConnectionState] =
