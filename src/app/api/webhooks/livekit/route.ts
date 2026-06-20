@@ -426,15 +426,24 @@ async function handleRoomFinished(
   // After room_finished we do a final sweep so free-tier users are also
   // pushed to Stripe if their chargeable_minutes > 0 (i.e., they exceeded cap).
 
-  const { data: dbRoom } = await supabase
+  const { data: dbRoomFinishedRaw } = await supabase
     .from("rooms")
     .select("id")
     .eq("livekit_room_name", room.name ?? "")
     .single();
+  const dbRoom = dbRoomFinishedRaw as unknown as Pick<RoomRow, "id"> | null;
 
   if (dbRoom === null) return;
 
-  const { data: unprocessedMeters } = await supabase
+  type UnprocessedMeter = {
+    id: string;
+    user_id: string;
+    chargeable_minutes: number;
+    session_end_at: string;
+    users: { stripe_customer_id: string | null } | null;
+  };
+
+  const { data: unprocessedMetersRaw } = await supabase
     .from("billing_meters")
     .select(
       "id, user_id, chargeable_minutes, session_end_at, users(stripe_customer_id)",
@@ -442,6 +451,7 @@ async function handleRoomFinished(
     .eq("room_id", dbRoom.id)
     .eq("is_processed", false)
     .gt("chargeable_minutes", 0);
+  const unprocessedMeters = unprocessedMetersRaw as unknown as UnprocessedMeter[] | null;
 
   if (unprocessedMeters === null || unprocessedMeters.length === 0) {
     log.info({ roomId: dbRoom.id }, "No unprocessed chargeable meters after room_finished");
@@ -449,19 +459,13 @@ async function handleRoomFinished(
   }
 
   const stripePushEvents = unprocessedMeters
-    .filter((m) => {
-      const customer = m.users as { stripe_customer_id: string | null } | null;
-      return customer?.stripe_customer_id != null;
-    })
-    .map((m) => {
-      const customer = m.users as { stripe_customer_id: string };
-      return {
-        billingMeterId:     m.id as string,
-        stripeCustomerId:   customer.stripe_customer_id,
-        participantMinutes: m.chargeable_minutes as number,
-        sessionEndAt:       new Date(m.session_end_at as string),
-      };
-    });
+    .filter((m) => m.users?.stripe_customer_id != null)
+    .map((m) => ({
+      billingMeterId:     m.id,
+      stripeCustomerId:   m.users!.stripe_customer_id as string,
+      participantMinutes: m.chargeable_minutes,
+      sessionEndAt:       new Date(m.session_end_at),
+    }));
 
   if (stripePushEvents.length === 0) {
     log.info({ roomId: dbRoom.id }, "No Stripe customers to push meters for");
