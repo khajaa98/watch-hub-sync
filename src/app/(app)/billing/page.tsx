@@ -18,6 +18,7 @@ import {
   Users,
   ShieldCheck,
   ExternalLink,
+  type LucideIcon,
 } from "lucide-react";
 import { createSupabaseServerComponentClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -57,7 +58,7 @@ function FeatureItem({
   label,
   muted = false,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   label: string;
   muted?: boolean;
 }) {

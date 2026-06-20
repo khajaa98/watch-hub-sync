@@ -26,6 +26,7 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import type Stripe from "stripe";
 import {
   requireUser,
   AuthRequiredError,
@@ -117,7 +118,9 @@ export async function POST(
   const { pricePremium } = getStripeEnv();
 
   try {
-    const sessionParams: Parameters<typeof stripe.checkout.sessions.create>[0] = {
+    // Build params mutably to avoid conditional spread creating a union type
+    // that confuses TypeScript's overload resolution on sessions.create().
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "payment",
 
       line_items: [
@@ -131,14 +134,6 @@ export async function POST(
       // The webhook handler reads client_reference_id to know which user
       // to upgrade. Without this field the payment cannot be attributed.
       client_reference_id: userId,
-
-      // Pre-fill the email field in Stripe's hosted checkout UI.
-      // If the user already has a Stripe customer record, link it.
-      ...(profile?.stripe_customer_id !== null && profile?.stripe_customer_id !== undefined
-        ? { customer: profile.stripe_customer_id }
-        : userEmail !== undefined
-        ? { customer_email: userEmail }
-        : {}),
 
       // Metadata is included in all Stripe Dashboard views and webhook payloads.
       // Redundant with client_reference_id — belt-and-suspenders for ops triage.
@@ -158,6 +153,18 @@ export async function POST(
       // Automatic tax collection via Stripe Tax (requires Stripe Tax enabled in dashboard)
       // automatic_tax: { enabled: true },
     };
+
+    // Pre-fill customer details — set separately to keep params type clean.
+    if (
+      profile?.stripe_customer_id !== null &&
+      profile?.stripe_customer_id !== undefined
+    ) {
+      // Link existing Stripe customer so saved cards appear in checkout.
+      sessionParams.customer = profile.stripe_customer_id;
+    } else if (userEmail !== undefined) {
+      // Pre-fill the email field in Stripe's hosted checkout UI.
+      sessionParams.customer_email = userEmail;
+    }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
