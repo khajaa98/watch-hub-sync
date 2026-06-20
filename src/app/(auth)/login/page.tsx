@@ -251,10 +251,9 @@ function LoginForm({
             disabled={isLoading}
             autoFocus
             icon={Mail}
-            {...(errorMessage !== null && {
-              "aria-describedby": `${formId}-error`,
-              "aria-invalid": "true" as const,
-            })}
+            {...(errorMessage !== null
+              ? { "aria-describedby": `${formId}-error`, "aria-invalid": "true" as const }
+              : {})}
           />
         </div>
 
