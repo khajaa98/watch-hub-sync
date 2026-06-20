@@ -23,6 +23,7 @@ import {
   useId,
   useEffect,
 } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
@@ -225,6 +226,7 @@ interface CreateRoomDialogProps {
 
 export function CreateRoomDialog({ onClose, onCreated }: CreateRoomDialogProps) {
   const formId = useId();
+  const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [isPending, startTransition] = useTransition();
 
@@ -609,10 +611,14 @@ export function CreateRoomDialog({ onClose, onCreated }: CreateRoomDialogProps) 
             </Button>
           )}
 
-          {step === 3 && (
+          {step === 3 && createdRoom !== null && (
             <Button
               size="sm"
-              onClick={onClose}
+              onClick={() => {
+                const url = `/rooms/${createdRoom.id}?invite=${encodeURIComponent(createdRoom.inviteUrl)}`;
+                onClose();
+                router.push(url);
+              }}
               rightIcon={<ArrowRight className="h-3.5 w-3.5" />}
             >
               Go to Room
