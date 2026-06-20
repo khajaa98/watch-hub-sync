@@ -22,7 +22,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import {
-  createSupabaseRouteHandlerClient,
+  createSupabaseServiceClient,
   requireUser,
   AuthRequiredError,
 } from "@/lib/supabase/server";
@@ -142,7 +142,10 @@ export async function POST(
   const inviteExpiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
 
   // ── 4. Insert room ───────────────────────────────────────────────────────
-  const supabase = createSupabaseRouteHandlerClient();
+  // Use the service client (bypasses RLS) — auth is already verified above
+  // via requireUser(). The route-handler user client can fail silently under
+  // RLS if cookie forwarding is incomplete or policies have gaps.
+  const supabase = createSupabaseServiceClient();
 
   const { data: room, error: roomError } = await supabase
     .from("rooms")
@@ -161,7 +164,7 @@ export async function POST(
   if (roomError !== null || room === null) {
     console.error("[WHS] Failed to insert room:", roomError);
     return NextResponse.json<ErrorResponse>(
-      { error: "Failed to create room. Please try again." },
+      { error: `DB error (rooms): ${roomError?.message ?? "null row returned"}` },
       { status: 500 },
     );
   }
@@ -186,7 +189,7 @@ export async function POST(
     // Room exists — clean up to avoid orphaned room
     await supabase.from("rooms").delete().eq("id", room.id);
     return NextResponse.json<ErrorResponse>(
-      { error: "Failed to initialise room membership. Please try again." },
+      { error: `DB error (participants): ${participantError.message}` },
       { status: 500 },
     );
   }
