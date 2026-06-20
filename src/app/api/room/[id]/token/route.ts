@@ -34,6 +34,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { AccessToken, type VideoGrant } from "livekit-server-sdk";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
 import { createLogger } from "@/lib/logger";
+import type { RoomRow, ParticipantRow, UserRow } from "@/types/supabase";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -143,11 +144,12 @@ export async function GET(
   }
 
   // ── 3. Room existence + status check ────────────────────────────────────
-  const { data: room, error: roomError } = await supabase
+  const { data: roomRaw, error: roomError } = await supabase
     .from("rooms")
     .select("id, livekit_room_name, status, host_id")
     .eq("id", roomId)
     .single();
+  const room = roomRaw as unknown as RoomRow | null;
 
   if (roomError !== null || room === null) {
     return NextResponse.json<ErrorResponseBody>(
@@ -175,13 +177,14 @@ export async function GET(
   // The host is always pre-inserted as a participant during room creation
   // (via POST /api/rooms), so this check is symmetric for all roles.
 
-  const { data: participant, error: participantError } = await supabase
+  const { data: participantRaw, error: participantError } = await supabase
     .from("participants")
     .select("id, role, device_type")
     .eq("room_id", roomId)
     .eq("user_id", user.id)
     .is("left_at", null)
     .maybeSingle();
+  const participant = participantRaw as unknown as ParticipantRow | null;
 
   if (participantError !== null) {
     log.error({ participantError, roomId, userId: user.id }, "Participant query error");
@@ -200,11 +203,12 @@ export async function GET(
   }
 
   // ── 5. Fetch user display profile for token identity ────────────────────
-  const { data: profile } = await supabase
+  const { data: profileRaw } = await supabase
     .from("users")
     .select("display_name, email")
     .eq("id", user.id)
     .single();
+  const profile = profileRaw as unknown as UserRow | null;
 
   const displayName =
     profile?.display_name ??

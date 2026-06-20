@@ -296,8 +296,8 @@ export default async function DashboardPage() {
       .limit(30),
   ]);
 
-  const profile = profileResult.data;
-  const rooms = roomsResult.data ?? [];
+  const profile = profileResult.data as unknown as UserRow | null;
+  const rooms = (roomsResult.data ?? []) as unknown as RoomRow[];
 
   const displayName =
     profile?.display_name ??

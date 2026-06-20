@@ -35,6 +35,7 @@ import type Stripe from "stripe";
 import { createSupabaseServiceClient } from "@/lib/supabase/server";
 import { constructStripeEvent } from "@/lib/billing/stripe-client";
 import { createLogger } from "@/lib/logger";
+import type { UserRow } from "@/types/supabase";
 
 // ---------------------------------------------------------------------------
 // Route config
@@ -147,11 +148,12 @@ async function resolveUserFromStripeCustomer(
 ): Promise<string | null> {
   const supabase = createSupabaseServiceClient();
 
-  const { data, error } = await supabase
+  const { data: dataRaw, error } = await supabase
     .from("users")
     .select("id")
     .eq("stripe_customer_id", stripeCustomerId)
     .single();
+  const data = dataRaw as unknown as Pick<UserRow, "id"> | null;
 
   if (error !== null || data === null) {
     log.warn(

@@ -30,11 +30,16 @@ export default async function AppLayout({ children }: AppLayoutProps) {
   }
 
   // Fetch minimal profile for nav display — parallel to page data fetches.
-  const { data: profile } = await supabase
+  const { data: profileRaw } = await supabase
     .from("users")
     .select("display_name, avatar_url, subscription_tier")
     .eq("id", user.id)
     .single();
+  const profile = profileRaw as unknown as {
+    display_name: string | null;
+    avatar_url: string | null;
+    subscription_tier: "free" | "premium";
+  } | null;
 
   return (
     <div className="flex min-h-dvh flex-col bg-canvas">

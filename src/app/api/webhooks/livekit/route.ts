@@ -48,6 +48,7 @@ import {
 } from "@/lib/billing/meter-calculator";
 import { pushStripeParticipantMinutes } from "@/lib/billing/stripe-client";
 import type Stripe from "stripe";
+import type { RoomRow, UserRow, BillingMeterRow } from "@/types/supabase";
 
 // ---------------------------------------------------------------------------
 // Route config
@@ -240,11 +241,12 @@ async function handleParticipantLeft(
   // ── Look up room by LiveKit room name ────────────────────────────────────
   const supabase = createSupabaseServiceClient();
 
-  const { data: dbRoom, error: roomError } = await supabase
+  const { data: dbRoomRaw, error: roomError } = await supabase
     .from("rooms")
     .select("id, host_id")
     .eq("livekit_room_name", room.name ?? "")
     .single();
+  const dbRoom = dbRoomRaw as unknown as RoomRow | null;
 
   if (roomError !== null || dbRoom === null) {
     log.error(
@@ -255,11 +257,12 @@ async function handleParticipantLeft(
   }
 
   // ── Look up user's subscription tier ────────────────────────────────────
-  const { data: userProfile } = await supabase
+  const { data: userProfileRaw } = await supabase
     .from("users")
     .select("subscription_tier, stripe_customer_id")
     .eq("id", userId)
     .single();
+  const userProfile = userProfileRaw as unknown as UserRow | null;
 
   const tier = (userProfile?.subscription_tier ?? "free") as SubscriptionTier;
   const stripeCustomerId = userProfile?.stripe_customer_id ?? null;
@@ -267,13 +270,14 @@ async function handleParticipantLeft(
   // ── Fetch consumed minutes this billing period ───────────────────────────
   const { periodStart, periodEnd } = getBillingPeriodBounds(sessionEndAt);
 
-  const { data: consumedData } = await supabase
+  const { data: consumedDataRaw } = await supabase
     .from("billing_meters")
     .select("participant_minutes")
     .eq("user_id", userId)
     .gte("session_end_at", periodStart.toISOString())
     .lt("session_end_at", periodEnd.toISOString())
     .eq("is_processed", false);
+  const consumedData = consumedDataRaw as unknown as Pick<BillingMeterRow, "participant_minutes">[] | null;
 
   const consumedMinutesThisPeriod =
     consumedData?.reduce(
@@ -348,11 +352,12 @@ async function handleParticipantLeft(
   // monthly after tier caps are applied by the batch job.
   if (tier === "premium" && stripeCustomerId !== null && chargeableMinutes > 0) {
     // Fetch the newly inserted meter ID for the idempotency key
-    const { data: newMeter } = await supabase
+    const { data: newMeterRaw } = await supabase
       .from("billing_meters")
       .select("id")
       .eq("livekit_event_id", eventId)
       .single();
+    const newMeter = newMeterRaw as unknown as Pick<BillingMeterRow, "id"> | null;
 
     if (newMeter !== null) {
       try {
