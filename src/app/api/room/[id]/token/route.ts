@@ -91,7 +91,7 @@ function requireEnv(key: string): string {
 // ---------------------------------------------------------------------------
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } },
 ): Promise<NextResponse<TokenResponseBody | ErrorResponseBody>> {
   const roomId = params.id;
