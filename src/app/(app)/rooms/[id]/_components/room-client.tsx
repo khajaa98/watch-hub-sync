@@ -104,7 +104,7 @@ function RoomUI({
   const platformColor = PLATFORM_COLORS[room.platform] ?? "text-neutral-400 bg-white/5 border-white/10";
 
   // ── DataChannel receive ────────────────────────────────────────────────────
-  useDataChannel(undefined, (message) => {
+  useDataChannel("sync", (message) => {
     try {
       const decoded = new TextDecoder().decode(message.payload);
       const parsed = JSON.parse(decoded) as SyncMessage;
@@ -121,7 +121,7 @@ function RoomUI({
       if (!isHost) return;
       const msg: SyncMessage = { type, position, ts: Date.now() };
       const encoded = new TextEncoder().encode(JSON.stringify(msg));
-      void lkRoom.localParticipant.publishData(encoded, { reliable: true });
+      void lkRoom.localParticipant.publishData(encoded, { reliable: true, topic: "sync" });
       setSyncState(msg);
       setLastSyncAt(new Date());
     },
