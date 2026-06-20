@@ -8,7 +8,7 @@
  * (data-channel only — no audio/video), and renders the host dashboard.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   LiveKitRoom,
