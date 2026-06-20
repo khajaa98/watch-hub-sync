@@ -118,7 +118,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   let event: Awaited<ReturnType<WebhookReceiver["receive"]>>;
   try {
-    event = await getReceiver().receive(rawBody, authHeader);
+    event = await getReceiver().receive(rawBody, authHeader ?? undefined);
   } catch (cause) {
     // Do NOT log rawBody here — it could contain spoofed data
     log.warn({ cause: String(cause) }, "LiveKit webhook signature verification failed");
