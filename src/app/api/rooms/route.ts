@@ -62,11 +62,6 @@ interface RoomSettings {
   sync_tolerance_ms?: number;
 }
 
-interface CreateRoomBody {
-  platform: Platform;
-  settings: RoomSettings;
-}
-
 interface CreateRoomResponse {
   readonly id: string;
   readonly inviteUrl: string;
