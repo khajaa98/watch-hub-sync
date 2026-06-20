@@ -1,30 +1,11 @@
 /**
  * src/app/(auth)/login/page.tsx
  *
- * WatchHubSync — Premium Cinematic Authentication Interface.
+ * WatchHubSync — Cinematic Authentication Interface.
  *
  * Two sign-in paths:
- *
- *   1. Email Magic Link (OTP)
- *      → User enters email → Supabase sends a one-time link
- *      → Clicking the link hits /auth/callback → session established
- *
- *   2. FIDO Passkey
- *      → Browser calls navigator.credentials.get() with server challenge
- *      → Assertion sent to /api/auth/passkey/authenticate/complete
- *      → On success, a custom Supabase session is minted server-side
- *
- * States:
- *   idle       → form visible (email input + both buttons)
- *   loading    → spinner, inputs disabled
- *   sent       → magic link sent confirmation panel (animated)
- *   passkey    → passkey ceremony in progress (browser native UI handles it)
- *   error      → inline error with retry
- *
- * Performance:
- *   - No layout shift: the card has an explicit min-height
- *   - Passkey check is gated by `PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()`
- *     so the button only appears when hardware support exists
+ *   1. Email Magic Link (OTP / PKCE) → /api/auth/callback
+ *   2. FIDO Passkey → navigator.credentials.get()
  */
 
 "use client";
@@ -46,7 +27,6 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { absoluteUrl } from "@/lib/utils";
@@ -71,31 +51,15 @@ type AuthStep =
 const SPRING = { type: "spring", stiffness: 380, damping: 30 } as const;
 
 const panelVariants = {
-  enter: {
-    opacity: 0,
-    y: 14,
-    scale: 0.98,
-    transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
-  },
-  center: {
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] },
-  },
-  exit: {
-    opacity: 0,
-    y: -10,
-    scale: 0.99,
-    transition: { duration: 0.2, ease: "easeIn" },
-  },
+  enter:  { opacity: 0, y: 12, scale: 0.98, transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
+  center: { opacity: 1, y: 0,  scale: 1,    transition: { duration: 0.3, ease: [0.16, 1, 0.3, 1] } },
+  exit:   { opacity: 0, y: -8, scale: 0.99, transition: { duration: 0.18, ease: "easeIn" } },
 };
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
 
-/** Success panel shown after magic link is dispatched */
 function SentPanel({ email, onRetry }: { email: string; onRetry: () => void }) {
   return (
     <motion.div
@@ -103,49 +67,39 @@ function SentPanel({ email, onRetry }: { email: string; onRetry: () => void }) {
       initial="enter"
       animate="center"
       exit="exit"
-      className="flex flex-col items-center gap-5 text-center"
+      className="flex flex-col items-center gap-6 py-2 text-center"
     >
-      {/* Animated check */}
       <motion.div
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ delay: 0.1, ...SPRING }}
-        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-ok/10 ring-1 ring-ok/20"
+        className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20"
       >
-        <CheckCircle2 className="h-7 w-7 text-ok" aria-hidden="true" />
-        {/* Pulse ring */}
-        <span
-          className="absolute inset-0 animate-ping-soft rounded-full ring-2 ring-ok/20"
-          aria-hidden="true"
-        />
+        <CheckCircle2 className="h-7 w-7 text-emerald-400" />
+        <span className="absolute inset-0 animate-ping rounded-full ring-2 ring-emerald-500/20 [animation-duration:2s]" />
       </motion.div>
 
-      <div className="space-y-1.5">
-        <h2 className="text-base font-semibold text-white">
-          Check your inbox
-        </h2>
-        <p className="text-sm text-neutral-400">
-          We sent a sign-in link to
-        </p>
-        <p className="rounded-lg bg-surface-raised px-3 py-1.5 text-sm font-medium text-white ring-1 ring-inset ring-white/[0.08]">
+      <div className="space-y-2">
+        <h2 className="text-base font-semibold text-white">Check your inbox</h2>
+        <p className="text-sm text-zinc-400">We sent a sign-in link to</p>
+        <p className="rounded-lg bg-zinc-800/80 px-4 py-2 text-sm font-medium text-white ring-1 ring-inset ring-white/[0.08]">
           {email}
         </p>
-        <p className="text-xs text-neutral-600">
-          The link expires in 60 minutes. Check spam if you don't see it.
+        <p className="text-xs text-zinc-600">
+          Link expires in 60 minutes · check spam if you don't see it
         </p>
       </div>
 
       <button
         onClick={onRetry}
-        className="text-xs text-neutral-600 underline underline-offset-2 transition-colors hover:text-neutral-300"
+        className="text-xs text-zinc-600 underline underline-offset-2 transition-colors hover:text-zinc-300"
       >
-        Didn't receive it? Try a different email
+        Try a different email
       </button>
     </motion.div>
   );
 }
 
-/** Passkey in-progress panel */
 function PasskeyPendingPanel() {
   return (
     <motion.div
@@ -153,37 +107,26 @@ function PasskeyPendingPanel() {
       initial="enter"
       animate="center"
       exit="exit"
-      className="flex flex-col items-center gap-5 text-center"
+      className="flex flex-col items-center gap-6 py-2 text-center"
     >
-      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-accent/10 ring-1 ring-accent/20">
+      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/10 ring-1 ring-violet-500/20">
         <motion.div
-          animate={{ scale: [1, 1.08, 1] }}
+          animate={{ scale: [1, 1.1, 1] }}
           transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         >
-          <Fingerprint className="h-7 w-7 text-accent" aria-hidden="true" />
+          <Fingerprint className="h-7 w-7 text-violet-400" />
         </motion.div>
-        <span
-          className="absolute inset-0 animate-pulse-ring rounded-full"
-          aria-hidden="true"
-        />
+        <span className="absolute inset-0 animate-ping rounded-full ring-2 ring-violet-500/20 [animation-duration:2s]" />
       </div>
-
       <div className="space-y-1.5">
-        <h2 className="text-base font-semibold text-white">
-          Verifying your passkey
-        </h2>
-        <p className="text-sm text-neutral-400">
-          Follow the prompt on your device — Touch ID, Face ID, or
-          Windows Hello.
+        <h2 className="text-base font-semibold text-white">Verifying passkey</h2>
+        <p className="text-sm text-zinc-400">
+          Follow the prompt — Touch ID, Face ID, or Windows Hello
         </p>
       </div>
     </motion.div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Main login form
-// ---------------------------------------------------------------------------
 
 function LoginForm({
   step,
@@ -200,6 +143,7 @@ function LoginForm({
 }) {
   const [email, setEmail] = useState("");
   const isLoading = step.id === "loading";
+  const errorMessage = step.id === "error" ? step.message : null;
 
   const handleSubmit = useCallback(
     (e: FormEvent<HTMLFormElement>) => {
@@ -211,9 +155,6 @@ function LoginForm({
     [email, onMagicLink],
   );
 
-  const errorMessage =
-    step.id === "error" ? step.message : null;
-
   return (
     <motion.div
       variants={panelVariants}
@@ -224,23 +165,20 @@ function LoginForm({
       <form
         id={formId}
         onSubmit={handleSubmit}
-        className="space-y-3"
+        className="space-y-4"
         noValidate
         aria-label="Sign in with email"
       >
-        {/* Email input */}
-        <div className="space-y-1.5">
+        {/* Email field */}
+        <div className="space-y-2">
           <label
             htmlFor={`${formId}-email`}
-            className="block text-xs font-medium text-neutral-400"
+            className="block text-xs font-medium text-zinc-400"
           >
             Email address
           </label>
           <div className="relative">
-            <Mail
-              className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-600"
-              aria-hidden="true"
-            />
+            <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
             <input
               id={`${formId}-email`}
               type="email"
@@ -252,22 +190,20 @@ function LoginForm({
               onChange={(e) => setEmail(e.target.value)}
               disabled={isLoading}
               className={cn(
-                "w-full rounded-xl bg-surface-raised py-3 pl-10 pr-4 text-sm text-white",
+                "w-full rounded-xl bg-zinc-800/60 py-3 pl-10 pr-4 text-sm text-white",
                 "ring-1 ring-inset ring-white/[0.08]",
-                "placeholder:text-neutral-700",
-                "focus:outline-none focus:ring-2 focus:ring-accent/50",
-                "disabled:opacity-50 disabled:cursor-not-allowed",
-                "transition-shadow duration-150",
+                "placeholder:text-zinc-600",
+                "focus:outline-none focus:ring-2 focus:ring-violet-500/50",
+                "disabled:cursor-not-allowed disabled:opacity-50",
+                "transition-all duration-150",
               )}
-              aria-describedby={
-                errorMessage !== null ? `${formId}-error` : undefined
-              }
+              aria-describedby={errorMessage !== null ? `${formId}-error` : undefined}
               aria-invalid={errorMessage !== null ? "true" : undefined}
             />
           </div>
         </div>
 
-        {/* Inline error */}
+        {/* Error message */}
         <AnimatePresence>
           {errorMessage !== null && (
             <motion.div
@@ -280,51 +216,46 @@ function LoginForm({
               aria-live="assertive"
               className="overflow-hidden"
             >
-              <div className="flex items-start gap-2 rounded-xl bg-danger/10 px-3.5 py-3 text-xs text-danger ring-1 ring-inset ring-danger/20">
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <div className="flex items-start gap-2 rounded-xl bg-red-500/10 px-3.5 py-3 text-xs text-red-400 ring-1 ring-inset ring-red-500/20">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 {errorMessage}
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Submit CTA */}
+        {/* Primary CTA */}
         <Button
           type="submit"
           size="lg"
           isLoading={isLoading && step.id === "loading" && step.method === "magic-link"}
           disabled={isLoading || email.trim().length === 0}
-          rightIcon={
-            isLoading ? undefined : (
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            )
-          }
+          rightIcon={isLoading ? undefined : <ArrowRight className="h-4 w-4" />}
           className="w-full"
         >
           Continue with email
         </Button>
       </form>
 
-      {/* Passkey option */}
+      {/* Passkey divider + button */}
       {hasPasskeySupport && (
         <>
-          <div className="divider-label my-4">
-            <span>or</span>
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-white/[0.06]" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-zinc-900 px-3 text-xs text-zinc-600">or</span>
+            </div>
           </div>
 
           <Button
             variant="secondary"
             size="lg"
             onClick={onPasskey}
-            isLoading={
-              isLoading &&
-              step.id === "loading" &&
-              step.method === "passkey"
-            }
+            isLoading={isLoading && step.id === "loading" && step.method === "passkey"}
             disabled={isLoading}
-            leftIcon={
-              <Fingerprint className="h-4 w-4 text-accent" aria-hidden="true" />
-            }
+            leftIcon={<Fingerprint className="h-4 w-4 text-violet-400" />}
             className="w-full"
             aria-label="Sign in with your saved passkey"
           >
@@ -337,10 +268,10 @@ function LoginForm({
 }
 
 // ---------------------------------------------------------------------------
-// Page
+// Page inner (uses useSearchParams — must be inside <Suspense>)
 // ---------------------------------------------------------------------------
 
-function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const formId = useId();
@@ -349,52 +280,44 @@ function LoginPage() {
   const [authStep, setAuthStep] = useState<AuthStep>({ id: "idle" });
   const [hasPasskeySupport, setHasPasskeySupport] = useState(false);
 
-  // Detect passkey platform support on mount
+  // Auth error from callback redirect
+  const authError = searchParams.get("error");
+
+  // Passkey platform detection
   useEffect(() => {
-    if (typeof window === "undefined") return;
     if (
+      typeof window === "undefined" ||
       typeof window.PublicKeyCredential === "undefined" ||
-      typeof window.PublicKeyCredential
-        .isUserVerifyingPlatformAuthenticatorAvailable !== "function"
-    ) {
-      return;
-    }
+      typeof window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable !== "function"
+    ) return;
 
     window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
-      .then((available) => setHasPasskeySupport(available))
+      .then((ok) => setHasPasskeySupport(ok))
       .catch(() => setHasPasskeySupport(false));
   }, []);
 
-  // Handle redirect param (sent by middleware)
   const redirectTo = searchParams.get("redirect") ?? "/dashboard";
 
-  // ── Magic link handler ─────────────────────────────────────────────────
+  // ── Magic link ────────────────────────────────────────────────────────────
   const handleMagicLink = useCallback(
     (email: string) => {
       setAuthStep({ id: "loading", method: "magic-link" });
-
       startTransition(async () => {
         try {
           const supabase = getSupabaseBrowserClient();
-
           const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
-              // The callback URL — Supabase redirects here after email click.
-              emailRedirectTo: absoluteUrl(`/auth/callback?redirect=${encodeURIComponent(redirectTo)}`),
+              emailRedirectTo: absoluteUrl(
+                `/api/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
+              ),
               shouldCreateUser: true,
             },
           });
-
           if (error !== null) {
-            setAuthStep({
-              id: "error",
-              method: "magic-link",
-              message: error.message,
-            });
+            setAuthStep({ id: "error", method: "magic-link", message: error.message });
             return;
           }
-
           setAuthStep({ id: "sent", email });
         } catch {
           setAuthStep({
@@ -408,27 +331,20 @@ function LoginPage() {
     [redirectTo],
   );
 
-  // ── Passkey handler ────────────────────────────────────────────────────
+  // ── Passkey ───────────────────────────────────────────────────────────────
   const handlePasskey = useCallback(() => {
     setAuthStep({ id: "loading", method: "passkey" });
-
     startTransition(async () => {
       try {
-        // Step 1: Get authentication options from server
         const optionsRes = await fetch("/api/auth/passkey/authenticate/begin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         });
-
-        if (!optionsRes.ok) {
-          throw new Error("Failed to initiate passkey authentication");
-        }
+        if (!optionsRes.ok) throw new Error("Failed to initiate passkey authentication");
 
         setAuthStep({ id: "passkey-pending" });
 
         const options = (await optionsRes.json()) as PublicKeyCredentialRequestOptions;
-
-        // Step 2: Browser prompts user (Face ID / fingerprint / hardware key)
         const credential = await navigator.credentials.get({
           publicKey: {
             ...options,
@@ -436,81 +352,52 @@ function LoginPage() {
               options.challenge instanceof ArrayBuffer
                 ? options.challenge
                 : Uint8Array.from(
-                    Object.values(
-                      options.challenge as unknown as Record<string, number>,
-                    ),
+                    Object.values(options.challenge as unknown as Record<string, number>),
                   ),
           },
         });
 
-        if (credential === null) {
-          throw new Error("No credential returned from authenticator");
-        }
+        if (credential === null) throw new Error("No credential returned from authenticator");
 
-        // Step 3: Send assertion to server for verification
-        const verifyRes = await fetch(
-          "/api/auth/passkey/authenticate/complete",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              credential: {
-                id: (credential as PublicKeyCredential).id,
-                rawId: Array.from(
+        const verifyRes = await fetch("/api/auth/passkey/authenticate/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            credential: {
+              id: (credential as PublicKeyCredential).id,
+              rawId: Array.from(new Uint8Array((credential as PublicKeyCredential).rawId)),
+              type: credential.type,
+              response: {
+                clientDataJSON: Array.from(
                   new Uint8Array(
-                    (credential as PublicKeyCredential).rawId,
+                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse).clientDataJSON,
                   ),
                 ),
-                type: credential.type,
-                response: {
-                  clientDataJSON: Array.from(
-                    new Uint8Array(
-                      (
-                        (credential as PublicKeyCredential)
-                          .response as AuthenticatorAssertionResponse
-                      ).clientDataJSON,
-                    ),
+                authenticatorData: Array.from(
+                  new Uint8Array(
+                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse).authenticatorData,
                   ),
-                  authenticatorData: Array.from(
-                    new Uint8Array(
-                      (
-                        (credential as PublicKeyCredential)
-                          .response as AuthenticatorAssertionResponse
-                      ).authenticatorData,
-                    ),
+                ),
+                signature: Array.from(
+                  new Uint8Array(
+                    ((credential as PublicKeyCredential).response as AuthenticatorAssertionResponse).signature,
                   ),
-                  signature: Array.from(
-                    new Uint8Array(
-                      (
-                        (credential as PublicKeyCredential)
-                          .response as AuthenticatorAssertionResponse
-                      ).signature,
-                    ),
-                  ),
-                },
+                ),
               },
-            }),
-          },
-        );
+            },
+          }),
+        });
 
         if (!verifyRes.ok) {
           const body = (await verifyRes.json()) as { error?: string };
           throw new Error(body.error ?? "Passkey verification failed");
         }
 
-        // Step 4: Session established — refresh and redirect
         router.push(redirectTo);
         router.refresh();
       } catch (err) {
-        // DOMException with name "NotAllowedError" means user cancelled
-        const isUserCancelled =
-          err instanceof DOMException && err.name === "NotAllowedError";
-
-        if (isUserCancelled) {
-          setAuthStep({ id: "idle" });
-          return;
-        }
-
+        const isUserCancelled = err instanceof DOMException && err.name === "NotAllowedError";
+        if (isUserCancelled) { setAuthStep({ id: "idle" }); return; }
         setAuthStep({
           id: "error",
           method: "passkey",
@@ -523,73 +410,114 @@ function LoginPage() {
     });
   }, [router, redirectTo]);
 
-  // ── Render ────────────────────────────────────────────────────────────
   return (
-    <div className="animate-fade-in">
-      {/* Card */}
-      <div className="glass rounded-2xl px-6 py-8 shadow-modal">
-        {/* Brand header */}
-        <div className="mb-8 text-center">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15 ring-1 ring-inset ring-accent/25">
-            <Sparkles className="h-5 w-5 text-accent" aria-hidden="true" />
-          </div>
-          <h1 className="text-xl font-semibold tracking-display text-white">
-            Cinema, together.
-          </h1>
-          <p className="mt-2 text-sm text-neutral-500">
-            Sign in to start or join a Watch Hub Sync session
-          </p>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-4 py-12">
+      {/* Ambient glow */}
+      <div
+        className="pointer-events-none fixed inset-0 overflow-hidden"
+        aria-hidden="true"
+      >
+        <div className="absolute left-1/2 top-0 h-[600px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-600/10 blur-[120px]" />
+      </div>
+
+      {/* Logo mark */}
+      <div className="relative mb-8 flex flex-col items-center gap-3">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-500/10 ring-1 ring-inset ring-violet-500/20">
+          <span className="text-lg font-bold tracking-tighter text-violet-400">W</span>
         </div>
-
-        {/* Animated content area */}
-        <div className="min-h-[200px]">
-          <AnimatePresence mode="wait" initial={false}>
-            {(authStep.id === "idle" ||
-              authStep.id === "loading" ||
-              authStep.id === "error") && (
-              <LoginForm
-                key="form"
-                step={authStep}
-                onMagicLink={handleMagicLink}
-                onPasskey={handlePasskey}
-                hasPasskeySupport={hasPasskeySupport}
-                formId={formId}
-              />
-            )}
-
-            {authStep.id === "sent" && (
-              <SentPanel
-                key="sent"
-                email={authStep.email}
-                onRetry={() => setAuthStep({ id: "idle" })}
-              />
-            )}
-
-            {authStep.id === "passkey-pending" && (
-              <PasskeyPendingPanel key="passkey" />
-            )}
-          </AnimatePresence>
+        <div className="text-center">
+          <h1 className="text-lg font-semibold tracking-tight text-white">
+            Watch Hub Sync
+          </h1>
+          <p className="text-sm text-zinc-500">Cinema, together.</p>
         </div>
       </div>
 
-      {/* Guest join prompt */}
-      <p className="mt-6 text-center text-xs text-neutral-700">
-        Have an invite link?{" "}
+      {/* Glass card */}
+      <div className="relative w-full max-w-sm">
+        {/* Card glow border */}
+        <div
+          className="pointer-events-none absolute -inset-px rounded-2xl"
+          style={{
+            background:
+              "linear-gradient(145deg, rgba(139,92,246,0.15), rgba(255,255,255,0.03) 60%)",
+          }}
+          aria-hidden="true"
+        />
+        <div className="relative rounded-2xl bg-zinc-900/80 px-6 py-8 shadow-2xl ring-1 ring-inset ring-white/[0.06] backdrop-blur-xl">
+          {/* Callback auth error */}
+          {authError === "auth-failed" && (
+            <div className="mb-5 flex items-start gap-2 rounded-xl bg-red-500/10 px-3.5 py-3 text-xs text-red-400 ring-1 ring-inset ring-red-500/20">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Sign-in link expired or already used. Please request a new one.
+            </div>
+          )}
+
+          <div className="mb-6">
+            <h2 className="text-base font-semibold text-white">Sign in</h2>
+            <p className="mt-1 text-sm text-zinc-500">
+              Enter your email to receive a magic link
+            </p>
+          </div>
+
+          <div className="min-h-[180px]">
+            <AnimatePresence mode="wait" initial={false}>
+              {(authStep.id === "idle" ||
+                authStep.id === "loading" ||
+                authStep.id === "error") && (
+                <LoginForm
+                  key="form"
+                  step={authStep}
+                  onMagicLink={handleMagicLink}
+                  onPasskey={handlePasskey}
+                  hasPasskeySupport={hasPasskeySupport}
+                  formId={formId}
+                />
+              )}
+              {authStep.id === "sent" && (
+                <SentPanel
+                  key="sent"
+                  email={authStep.email}
+                  onRetry={() => setAuthStep({ id: "idle" })}
+                />
+              )}
+              {authStep.id === "passkey-pending" && (
+                <PasskeyPendingPanel key="passkey" />
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
+      </div>
+
+      <p className="relative mt-6 text-xs text-zinc-700">
+        By signing in you agree to our{" "}
         <a
-          href="/join"
-          className="text-neutral-500 underline underline-offset-2 transition-colors hover:text-neutral-300"
+          href="/terms"
+          className="text-zinc-600 underline underline-offset-2 transition-colors hover:text-zinc-400"
         >
-          Join as a guest
+          Terms
+        </a>{" "}
+        and{" "}
+        <a
+          href="/privacy"
+          className="text-zinc-600 underline underline-offset-2 transition-colors hover:text-zinc-400"
+        >
+          Privacy Policy
         </a>
+        .
       </p>
     </div>
   );
 }
 
-export default function LoginPageWrapper() {
+// ---------------------------------------------------------------------------
+// Default export — Suspense wrapper required for useSearchParams
+// ---------------------------------------------------------------------------
+
+export default function LoginPage() {
   return (
     <Suspense>
-      <LoginPage />
+      <LoginPageInner />
     </Suspense>
   );
 }
