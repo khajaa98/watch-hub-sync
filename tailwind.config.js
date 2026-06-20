@@ -1,46 +1,44 @@
 /**
- * tailwind.config.ts
+ * tailwind.config.js  (converted from .ts — plain JS avoids jiti/TypeScript
+ * loading issues in CI environments where the PostCSS plugin loads the config
+ * outside of Next.js's SWC pipeline.)
+ *
+ * Content path uses ./src/** instead of per-directory globs so that route
+ * groups like (auth) and (app) — whose parentheses can be misread as extglob
+ * operators by some micromatch versions — are always included.
  *
  * WatchHubSync cinematic design system.
- *
- * Design philosophy:
- *   Minimalist restraint. Dark-first. Every color decision serves legibility
- *   over aesthetic. Surfaces are layered by elevation (canvas → surface →
- *   overlay → raised) using luminosity increments of ~4% to create depth
- *   without noise. The single accent (violet) is reserved for interactive
- *   affordance only — never decoration.
  */
 
-import type { Config } from "tailwindcss";
-
-const config: Config = {
+/** @type {import('tailwindcss').Config} */
+const config = {
   darkMode: "class",
   content: [
-    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // Single broad glob — catches everything under src/ including
+    // route groups with parentheses: (auth), (app), etc.
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
       // ── Colors ──────────────────────────────────────────────────────────
       colors: {
         // Elevation-based surface system
-        canvas:  "#0A0A0A", // page background — true near-black
+        canvas:  "#0A0A0A",
         surface: {
-          DEFAULT: "#111111", // base card surface
-          raised:  "#161616", // modal, popover, elevated card
-          overlay: "#1C1C1C", // dropdown, tooltip, contextual panels
-          high:    "#222222", // focused/active surface state
+          DEFAULT: "#111111",
+          raised:  "#161616",
+          overlay: "#1C1C1C",
+          high:    "#222222",
         },
-        // Accent — interactive affordance only (CTA, focus ring, link)
+        // Accent — interactive affordance only
         accent: {
-          DEFAULT:   "#7C3AED", // violet-600
-          hover:     "#6D28D9", // violet-700
-          subtle:    "rgba(124,58,237,0.10)",
+          DEFAULT:        "#7C3AED",
+          hover:          "#6D28D9",
+          subtle:         "rgba(124,58,237,0.10)",
           "subtle-hover": "rgba(124,58,237,0.16)",
-          foreground: "#FFFFFF",
+          foreground:     "#FFFFFF",
         },
-        // Platform brand colours (used for platform identity badges)
+        // Platform brand colours
         platform: {
           youtube:    "#FF0000",
           jiohotstar: "#1B69C6",
@@ -49,17 +47,17 @@ const config: Config = {
         },
         // Semantic states
         ok: {
-          DEFAULT: "#10B981", // emerald-500
+          DEFAULT: "#10B981",
           subtle:  "rgba(16,185,129,0.10)",
           border:  "rgba(16,185,129,0.20)",
         },
         warn: {
-          DEFAULT: "#F59E0B", // amber-500
+          DEFAULT: "#F59E0B",
           subtle:  "rgba(245,158,11,0.10)",
           border:  "rgba(245,158,11,0.20)",
         },
         danger: {
-          DEFAULT: "#EF4444", // red-500
+          DEFAULT: "#EF4444",
           subtle:  "rgba(239,68,68,0.10)",
           border:  "rgba(239,68,68,0.20)",
         },
@@ -85,8 +83,8 @@ const config: Config = {
         "2xs": ["0.625rem", { lineHeight: "1rem" }],
       },
       letterSpacing: {
-        "display": "-0.03em",
-        "tighter-2": "-0.04em",
+        "display":    "-0.03em",
+        "tighter-2":  "-0.04em",
       },
 
       // ── Spacing & Geometry ──────────────────────────────────────────────
@@ -97,39 +95,31 @@ const config: Config = {
 
       // ── Shadows ─────────────────────────────────────────────────────────
       boxShadow: {
-        "glow-accent":  "0 0 24px rgba(124,58,237,0.20), 0 0 8px rgba(124,58,237,0.12)",
-        "glow-ok":      "0 0 16px rgba(16,185,129,0.20)",
-        "glow-warn":    "0 0 16px rgba(245,158,11,0.20)",
-        "glow-danger":  "0 0 16px rgba(239,68,68,0.20)",
-        "card":         "0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05)",
-        "card-hover":   "0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08)",
-        "modal":        "0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06)",
-        "inner-top":    "inset 0 1px 0 rgba(255,255,255,0.06)",
+        "glow-accent": "0 0 24px rgba(124,58,237,0.20), 0 0 8px rgba(124,58,237,0.12)",
+        "glow-ok":     "0 0 16px rgba(16,185,129,0.20)",
+        "glow-warn":   "0 0 16px rgba(245,158,11,0.20)",
+        "glow-danger": "0 0 16px rgba(239,68,68,0.20)",
+        "card":        "0 1px 3px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05)",
+        "card-hover":  "0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08)",
+        "modal":       "0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06)",
+        "inner-top":   "inset 0 1px 0 rgba(255,255,255,0.06)",
       },
 
       // ── Backgrounds ─────────────────────────────────────────────────────
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic":  "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-        // Subtle vignette overlay for cinema feel
         "vignette":
           "radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.6) 100%)",
-        // Noise grain texture (base64 SVG — lightweight)
         "noise":
           "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")",
       },
 
       // ── Animations ──────────────────────────────────────────────────────
       keyframes: {
-        "fade-in": {
-          from: { opacity: "0" },
-          to:   { opacity: "1" },
-        },
-        "fade-out": {
-          from: { opacity: "1" },
-          to:   { opacity: "0" },
-        },
-        "slide-up": {
+        "fade-in":   { from: { opacity: "0" }, to: { opacity: "1" } },
+        "fade-out":  { from: { opacity: "1" }, to: { opacity: "0" } },
+        "slide-up":  {
           from: { opacity: "0", transform: "translateY(12px)" },
           to:   { opacity: "1", transform: "translateY(0)" },
         },
@@ -181,4 +171,4 @@ const config: Config = {
   plugins: [],
 };
 
-export default config;
+module.exports = config;
