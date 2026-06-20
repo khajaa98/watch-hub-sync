@@ -220,7 +220,6 @@ class AdapterEventEmitter {
   ): void {
     for (const listener of this._listeners[event]) {
       try {
-        // @ts-expect-error — spread args through the handler union
         (listener as (...a: unknown[]) => void)(...args);
       } catch (err) {
         // Never let a consumer callback crash the adapter
