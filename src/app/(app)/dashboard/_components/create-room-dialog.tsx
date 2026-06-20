@@ -323,34 +323,34 @@ export function CreateRoomDialog({ onClose, onCreated }: CreateRoomDialogProps) 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — also acts as the centering shell via flexbox */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.2 }}
-        className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
         onClick={onClose}
         aria-hidden="true"
-      />
-
-      {/* Dialog panel */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.97, y: 6 }}
-        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={`${formId}-title`}
-        className={cn(
-          "fixed inset-x-4 top-[50%] z-50 max-w-lg -translate-y-1/2 sm:inset-x-auto sm:left-[50%] sm:-translate-x-1/2",
-          "rounded-2xl bg-surface shadow-modal",
-          "ring-1 ring-inset ring-white/[0.07]",
-          "flex flex-col overflow-hidden",
-          "max-h-[85dvh] sm:max-h-[80dvh]",
-        )}
       >
+        {/* Dialog panel — nested inside backdrop so flexbox centers it naturally */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.97, y: 6 }}
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`${formId}-title`}
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "w-full max-w-lg",
+            "rounded-2xl bg-surface shadow-modal",
+            "ring-1 ring-inset ring-white/[0.07]",
+            "flex flex-col overflow-hidden",
+            "max-h-[85dvh]",
+          )}
+        >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
           <div>
@@ -619,6 +619,7 @@ export function CreateRoomDialog({ onClose, onCreated }: CreateRoomDialogProps) 
             </Button>
           )}
         </div>
+        </motion.div>
       </motion.div>
     </>
   );
