@@ -516,7 +516,7 @@ export class PasskeyService {
       authenticatorSelection: {
         // "platform" prefers device-bound biometrics (Face ID, Touch ID, Windows Hello).
         // "cross-platform" allows hardware keys. We accept both.
-        authenticatorAttachment: undefined, // accept any
+        // authenticatorAttachment omitted — accepts both platform and cross-platform
         // require user verification (PIN or biometric) — mandatory for FIDO2
         userVerification: "required",
         // Store a resident key (discoverable credential) so users can log in
