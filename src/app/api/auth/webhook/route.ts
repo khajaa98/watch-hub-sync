@@ -245,9 +245,9 @@ async function handleUserUpdated(
       display_name:
         (user.user_metadata.full_name as string | undefined) ??
         (user.user_metadata.name as string | undefined) ??
-        undefined,
+        null,
       avatar_url:
-        (user.user_metadata.avatar_url as string | undefined) ?? undefined,
+        (user.user_metadata.avatar_url as string | undefined) ?? null,
       updated_at: new Date().toISOString(),
     })
     .eq("id", user.id);
