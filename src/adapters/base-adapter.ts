@@ -206,8 +206,7 @@ class AdapterEventEmitter {
     handler: AdapterEventHandlers[K],
   ): this {
     const wrapper = (...args: Parameters<AdapterEventHandlers[K]>) => {
-      // @ts-expect-error — spread args through the handler union
-      handler(...args);
+      (handler as (...a: unknown[]) => void)(...args);
       this.off(event, wrapper as AdapterEventHandlers[K]);
     };
     this.on(event, wrapper as AdapterEventHandlers[K]);
