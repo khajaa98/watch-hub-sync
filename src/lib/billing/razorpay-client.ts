@@ -179,6 +179,8 @@ export interface RazorpayPaymentEntity {
 }
 
 export interface RazorpayWebhookPayload<T = unknown> {
+  /** @internal phantom field — keeps T in scope for derived payload types */
+  readonly _payloadType?: T;
   readonly entity:    "event";
   readonly account_id: string;
   readonly event:     string;  // e.g. "subscription.charged"
