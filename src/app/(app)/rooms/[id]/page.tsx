@@ -6,7 +6,10 @@
  */
 
 import { notFound, redirect } from "next/navigation";
-import { createSupabaseServerComponentClient } from "@/lib/supabase/server";
+import {
+  createSupabaseServerComponentClient,
+  createSupabaseServiceClient,
+} from "@/lib/supabase/server";
 import { RoomClient } from "./_components/room-client";
 import type { RoomRow, UserRow } from "@/types/supabase";
 
@@ -29,16 +32,19 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
     notFound();
   }
 
-  const supabase = createSupabaseServerComponentClient();
-
-  // ── Auth ────────────────────────────────────────────────────────────────
+  // Auth uses the user client (cookie-based session check)
+  const authClient = createSupabaseServerComponentClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (!user) {
     redirect(`/login?redirect=/rooms/${roomId}`);
   }
+
+  // All DB reads use the service client to bypass RLS.
+  // Auth is already verified above — this is safe.
+  const supabase = createSupabaseServiceClient();
 
   // ── Fetch room ──────────────────────────────────────────────────────────
   const { data: roomRaw, error: roomError } = await supabase
@@ -54,7 +60,6 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
   }
 
   if (room.status === "closed") {
-    // Room ended — send back to dashboard with a flash message
     redirect("/dashboard?room=ended");
   }
 
@@ -67,7 +72,6 @@ export default async function RoomPage({ params, searchParams }: RoomPageProps) 
     .is("left_at", null)
     .maybeSingle();
 
-  // Not a participant — send to dashboard
   if (participantRaw === null) {
     redirect("/dashboard");
   }
