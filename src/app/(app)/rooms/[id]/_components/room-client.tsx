@@ -52,7 +52,7 @@ type SyncMessageType = "play" | "pause" | "seek";
 
 interface SyncMessage {
   type: SyncMessageType;
-  position?: number;
+  position?: number | undefined;
   ts: number;
 }
 
