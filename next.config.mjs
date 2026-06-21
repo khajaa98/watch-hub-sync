@@ -153,8 +153,8 @@ const nextConfig = {
             key:   "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Scripts: self + Vercel Analytics
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com",
+              // Scripts: self + Vercel Analytics + YouTube IFrame API
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://va.vercel-scripts.com https://www.youtube.com https://s.ytimg.com",
               // Styles: self + inline (for Tailwind JIT in dev)
               "style-src 'self' 'unsafe-inline'",
               // Images: self + Supabase storage + Google avatars + data URIs
@@ -162,14 +162,14 @@ const nextConfig = {
               // Fonts: self + Geist (loaded as next/font, bundled locally)
               "font-src 'self'",
               // Connect: our API + Supabase Realtime + LiveKit WebRTC signaling + Axiom + PostHog
-              // OTT platforms are intentionally excluded — we are a sync engine, not a proxy.
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.livekit.cloud wss://*.livekit.cloud https://api.axiom.co https://app.posthog.com https://eu.posthog.com",
+              // + YouTube metadata/thumbnail fetches triggered by the IFrame API
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.livekit.cloud wss://*.livekit.cloud https://api.axiom.co https://app.posthog.com https://eu.posthog.com https://www.youtube.com https://s.ytimg.com",
               // Media: self + blob (for any local object URLs)
               "media-src 'self' blob:",
               // Workers: self
               "worker-src 'self' blob:",
-              // Frame: deny all (no iframes)
-              "frame-src 'none'",
+              // Frame: self + YouTube embed (theater player)
+              "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
               // Form: self only
               "form-action 'self'",
               // Base URI: self only
