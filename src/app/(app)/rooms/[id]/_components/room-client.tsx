@@ -119,7 +119,10 @@ function RoomUI({
   const sendSync = useCallback(
     (type: SyncMessageType, position?: number) => {
       if (!isHost) return;
-      const msg: SyncMessage = { type, position, ts: Date.now() };
+      // exactOptionalPropertyTypes: omit 'position' key entirely when undefined
+      const msg: SyncMessage = position !== undefined
+        ? { type, position, ts: Date.now() }
+        : { type, ts: Date.now() };
       const encoded = new TextEncoder().encode(JSON.stringify(msg));
       void lkRoom.localParticipant.publishData(encoded, { reliable: true, topic: "sync" });
       setSyncState(msg);
