@@ -220,7 +220,8 @@ function RoomUI({
             <div className="flex flex-wrap gap-2">
               {participants.map((p) => {
                 const isMe = p.identity.startsWith(userId);
-                const name = p.name ?? p.identity.split(":")[0] ?? "Guest";
+                const identityPrefix = p.identity.split(":")[0];
+                const name = p.name ?? identityPrefix ?? "Guest";
                 const isRoomHost = p.permissions?.canPublishData === true && isHost && isMe;
                 return (
                   <div
