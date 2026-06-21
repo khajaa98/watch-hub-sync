@@ -122,13 +122,18 @@ function extractYouTubeId(value: string): string | null {
 /**
  * Build a safe YouTube embed URL from any raw input.
  * Returns null if no valid 11-char ID can be extracted.
+ *
+ * The `origin` parameter tells YouTube which page is allowed to send
+ * postMessage commands — required for seekTo/playVideo to be accepted.
  */
 function getYouTubeEmbedUrl(raw: string): string | null {
   const id = extractYouTubeId(raw);
   if (id === null) return null;
-  // origin param omitted — some strict browser/CSP setups block the embed when
-  // the origin param doesn't exactly match the served domain. Re-add once stable.
-  return `https://www.youtube.com/embed/${id}?enablejsapi=1&rel=0&modestbranding=1&fs=1`;
+  const origin =
+    typeof window !== "undefined"
+      ? `&origin=${encodeURIComponent(window.location.origin)}`
+      : "";
+  return `https://www.youtube.com/embed/${id}?enablejsapi=1${origin}&rel=0&modestbranding=1&fs=1`;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,18 +143,16 @@ function getYouTubeEmbedUrl(raw: string): string | null {
 interface YouTubePlayerProps {
   readonly embedUrl: string;
   readonly iframeRef: React.RefObject<HTMLIFrameElement>;
+  readonly onLoad?: () => void;
 }
 
-function YouTubePlayer({ embedUrl, iframeRef }: YouTubePlayerProps) {
-  useEffect(() => {
-    console.log("[WHS] Rendering iframe with src:", embedUrl);
-  }, [embedUrl]);
-
+function YouTubePlayer({ embedUrl, iframeRef, onLoad }: YouTubePlayerProps) {
   return (
     <iframe
       key={embedUrl}
       ref={iframeRef}
       src={embedUrl}
+      onLoad={onLoad}
       className="h-full w-full border-0"
       title="YouTube video player"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -368,8 +371,21 @@ function RoomUI({
     : null;
   const youtubeReady = isYouTube && embedUrl !== null;
 
-  // ── Track YouTube currentTime + playerState via postMessage events ───────
-  // YouTube sends infoDelivery messages ~every 250ms while playing.
+  // ── Initialize YouTube IFrame API channel ────────────────────────────────
+  // YouTube only processes seekTo/playVideo commands AFTER receiving a
+  // "listening" handshake from the parent page. Without this, all our
+  // postMessage commands are silently dropped.
+  const handleIframeLoad = useCallback(() => {
+    console.log("[WHS] iframe loaded — sending YouTube API listening handshake");
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "listening", id: 1, channel: "widget" }),
+      "https://www.youtube.com",
+    );
+  }, []);
+
+  // ── Track YouTube state via postMessage events ────────────────────────────
+  // infoDelivery   → {event:"infoDelivery", info:{currentTime, playerState}}
+  // onStateChange  → {event:"onStateChange", info: <number>}   ← info IS the state
   // playerState values: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering
   useEffect(() => {
     const handler = (event: MessageEvent<unknown>) => {
@@ -377,13 +393,26 @@ function RoomUI({
       try {
         const data = JSON.parse(event.data as string) as {
           event?: string;
-          info?: { currentTime?: number; playerState?: number };
+          info?: number | { currentTime?: number; playerState?: number };
         };
-        if (data.event === "infoDelivery") {
-          if (typeof data.info?.currentTime === "number") {
+
+        // State changes come as a bare number in info
+        if (data.event === "onStateChange" && typeof data.info === "number") {
+          playerStateRef.current = data.info;
+          console.log("[WHS] YT playerState →", data.info,
+            data.info === 1 ? "(playing)" : data.info === 2 ? "(paused)" : "");
+        }
+
+        // Periodic delivery while playing — currentTime and playerState
+        if (
+          data.event === "infoDelivery" &&
+          typeof data.info === "object" &&
+          data.info !== null
+        ) {
+          if (typeof data.info.currentTime === "number") {
             currentTimeRef.current = data.info.currentTime;
           }
-          if (typeof data.info?.playerState === "number") {
+          if (typeof data.info.playerState === "number") {
             playerStateRef.current = data.info.playerState;
           }
         }
@@ -426,9 +455,10 @@ function RoomUI({
 
           // Deadband: only seek if drift ≥ 1.0s to avoid micro-stuttering
           if (diff >= 1.0) {
-            console.log("[WHS] Syncing to host:", hostTime.toFixed(2));
+            console.log("[WHS] Syncing to host:", hostTime.toFixed(2), "(was:", guestTime.toFixed(2), ")");
             sendToPlayer("seekTo", [hostTime, true]);
-            currentTimeRef.current = hostTime;
+            // Note: do NOT update currentTimeRef here — only trust actual
+            // infoDelivery/onStateChange events so drift is recalculated honestly.
           }
 
           // Play enforcer
@@ -624,7 +654,7 @@ function RoomUI({
             style={{ aspectRatio: "16 / 9" }}
           >
             {youtubeReady && embedUrl !== null ? (
-              <YouTubePlayer embedUrl={embedUrl} iframeRef={iframeRef} />
+              <YouTubePlayer embedUrl={embedUrl} iframeRef={iframeRef} onLoad={handleIframeLoad} />
             ) : isYouTube ? (
               <InvalidVideoLink />
             ) : (
