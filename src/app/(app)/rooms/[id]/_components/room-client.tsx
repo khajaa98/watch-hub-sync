@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import QRCode from "qrcode";
 import { useRouter } from "next/navigation";
 import {
   LiveKitRoom,
@@ -23,6 +24,7 @@ import { ConnectionState } from "livekit-client";
 import {
   Copy,
   Check,
+  X,
   Users,
   LogOut,
   Wifi,
@@ -33,6 +35,7 @@ import {
   Crown,
   Radio,
   ExternalLink,
+  QrCode,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RoomRow, RoomSettings } from "@/types/supabase";
@@ -207,6 +210,108 @@ function PlatformLinkCard({ platform, contentTitle, contentId }: PlatformLinkCar
 }
 
 // ---------------------------------------------------------------------------
+// InviteModal — persistent QR + copy dialog (host only)
+// ---------------------------------------------------------------------------
+
+interface InviteModalProps {
+  readonly inviteUrl: string;
+  readonly onClose: () => void;
+}
+
+function InviteModal({ inviteUrl, onClose }: InviteModalProps) {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [copied, setCopied]       = useState(false);
+
+  useEffect(() => {
+    QRCode.toDataURL(inviteUrl, {
+      width: 220,
+      margin: 2,
+      color: { dark: "#FAFAFA", light: "#111111" },
+      errorCorrectionLevel: "M",
+    })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(null));
+  }, [inviteUrl]);
+
+  const handleCopy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard unavailable */ }
+  }, [inviteUrl]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl border border-white/[0.08] bg-zinc-900 p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="mb-5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <QrCode className="h-4 w-4 text-violet-400" />
+            <span className="text-sm font-semibold text-white">Invite Guests</span>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* QR code */}
+        <div className="mb-4 flex justify-center">
+          <div className="rounded-xl bg-[#111] p-3 ring-1 ring-white/[0.06]">
+            {qrDataUrl !== null ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={qrDataUrl}
+                alt="Scan to join"
+                width={180}
+                height={180}
+                className="rounded-lg"
+                style={{ imageRendering: "pixelated" }}
+              />
+            ) : (
+              <div className="h-[180px] w-[180px] animate-pulse rounded-lg bg-zinc-800" />
+            )}
+          </div>
+        </div>
+
+        {/* Hint */}
+        <p className="mb-4 text-center text-xs text-neutral-500">
+          Scan with a phone/tablet · Link expires in 48 hours
+        </p>
+
+        {/* Copy row */}
+        <div className="flex items-center gap-2 rounded-xl border border-white/[0.07] bg-black/30 px-3 py-2">
+          <code className="flex-1 truncate text-xs text-neutral-400">
+            {inviteUrl}
+          </code>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.05] px-3 py-1.5 text-xs text-neutral-300 transition-all hover:bg-white/[0.10]"
+          >
+            {copied
+              ? <Check className="h-3.5 w-3.5 text-emerald-400" />
+              : <Copy className="h-3.5 w-3.5" />}
+            {copied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // RoomUI — rendered inside LiveKitRoom context
 // ---------------------------------------------------------------------------
 
@@ -223,8 +328,7 @@ function RoomUI({
   const lkRoom          = useRoomContext();
   const iframeRef       = useRef<HTMLIFrameElement>(null);
 
-  const [copied, setCopied]         = useState(false);
-  const [showInvite, setShowInvite] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [lastSync, setLastSync]     = useState<LastSync | null>(null);
 
   const settings = (
@@ -289,16 +393,6 @@ function RoomUI({
     [isHost, lkRoom, sendToPlayer],
   );
 
-  // ── Copy invite link ─────────────────────────────────────────────────────
-  const handleCopy = useCallback(async () => {
-    if (inviteUrl === null) return;
-    try {
-      await navigator.clipboard.writeText(inviteUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard unavailable */ }
-  }, [inviteUrl]);
-
   // ── Leave / End ──────────────────────────────────────────────────────────
   const handleLeave = useCallback(() => {
     lkRoom.disconnect();
@@ -331,7 +425,7 @@ function RoomUI({
           {isHost && inviteUrl !== null && (
             <button
               type="button"
-              onClick={() => setShowInvite((v) => !v)}
+              onClick={() => setShowInviteModal((v) => !v)}
               className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs text-violet-400 transition-colors hover:bg-violet-500/20"
             >
               <Users className="h-3.5 w-3.5" />
@@ -364,25 +458,12 @@ function RoomUI({
         </div>
       </header>
 
-      {/* ── Invite strip (collapsible) ───────────────────────────────────── */}
-      {showInvite && inviteUrl !== null && (
-        <div className="border-b border-white/[0.05] bg-black/50 px-4 py-2.5 backdrop-blur-md">
-          <div className="mx-auto flex max-w-4xl items-center gap-2">
-            <code className="flex-1 truncate rounded border border-white/[0.06] bg-black/30 px-3 py-1.5 text-xs text-neutral-400">
-              {inviteUrl}
-            </code>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="flex shrink-0 items-center gap-1.5 rounded border border-white/[0.08] bg-white/[0.04] px-3 py-1.5 text-xs text-neutral-300 transition-all hover:bg-white/[0.08]"
-            >
-              {copied
-                ? <Check className="h-3.5 w-3.5 text-emerald-400" />
-                : <Copy className="h-3.5 w-3.5" />}
-              {copied ? "Copied!" : "Copy"}
-            </button>
-          </div>
-        </div>
+      {/* ── Invite modal (portal) ───────────────────────────────────────── */}
+      {showInviteModal && inviteUrl !== null && (
+        <InviteModal
+          inviteUrl={inviteUrl}
+          onClose={() => setShowInviteModal(false)}
+        />
       )}
 
       {/* ── Theater ─────────────────────────────────────────────────────── */}

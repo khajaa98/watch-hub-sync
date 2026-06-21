@@ -506,17 +506,14 @@ export function CreateRoomDialog({ onClose, onCreated }: CreateRoomDialogProps) 
                         aria-checked={state}
                         onClick={() => set(!state)}
                         className={cn(
-                          "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-250",
+                          "relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-200",
                           state ? "bg-accent" : "bg-white/[0.10]",
                         )}
                       >
                         <motion.span
-                          layout
+                          animate={{ x: state ? 16 : 0 }}
                           transition={{ type: "spring", stiffness: 500, damping: 35 }}
-                          className={cn(
-                            "inline-block h-3.5 w-3.5 rounded-full bg-white shadow",
-                            state ? "translate-x-[18px]" : "translate-x-[3px]",
-                          )}
+                          className="ml-[3px] mt-[3px] block h-3.5 w-3.5 shrink-0 rounded-full bg-white shadow"
                           aria-hidden="true"
                         />
                         <span className="sr-only">{label}</span>

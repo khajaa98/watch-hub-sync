@@ -300,9 +300,13 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
 
     if (isProtectedRoute(pathname) && !isAuthenticated) {
       // The JWT was absent, expired, or tampered — or session is unauthenticated.
+      // IMPORTANT: preserve search params (e.g. ?token=... on invite links) so
+      // the post-login redirect returns the user to the exact URL they intended.
+      const fullPath = pathname + request.nextUrl.search;
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = "/login";
-      loginUrl.searchParams.set("redirect", pathname);
+      loginUrl.search = "";
+      loginUrl.searchParams.set("redirect", fullPath);
       return NextResponse.redirect(loginUrl);
     }
 
