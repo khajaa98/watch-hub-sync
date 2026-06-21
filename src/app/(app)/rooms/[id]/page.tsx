@@ -12,12 +12,8 @@ import type { RoomRow, UserRow } from "@/types/supabase";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { id: string };
-}) {
-  return { title: `Room · Watch Hub Sync` };
+export function generateMetadata() {
+  return { title: "Room · Watch Hub Sync" };
 }
 
 interface RoomPageProps {
