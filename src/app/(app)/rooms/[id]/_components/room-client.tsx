@@ -89,22 +89,44 @@ const PLATFORM_URLS: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Extract the 11-character YouTube video ID from any common URL format:
+ *   https://www.youtube.com/watch?v=ID
+ *   https://youtu.be/ID
+ *   https://www.youtube.com/embed/ID
+ *   https://www.youtube.com/shorts/ID
+ *   ID  (bare 11-char alphanumeric)
+ */
 function extractYouTubeId(value: string): string | null {
   if (value.length === 0) return null;
-  const patterns = [
-    /[?&]v=([A-Za-z0-9_-]{11})/,
-    /youtu\.be\/([A-Za-z0-9_-]{11})/,
-    /youtube\.com\/embed\/([A-Za-z0-9_-]{11})/,
-  ];
-  for (const pattern of patterns) {
-    const m = value.match(pattern);
-    if (m !== null) {
-      const id = m[1];
-      if (id !== undefined) return id;
-    }
+  // Single consolidated regex — first capture group is always the 11-char ID.
+  const m = value.match(
+    /(?:[?&]v=|youtu\.be\/|youtube\.com\/(?:embed|shorts|v)\/)([A-Za-z0-9_-]{11})/,
+  );
+  if (m !== null) {
+    const id = m[1];
+    if (id !== undefined) return id;
   }
+  // Bare ID fallback
   if (/^[A-Za-z0-9_-]{11}$/.test(value)) return value;
   return null;
+}
+
+/**
+ * Build a safe YouTube embed URL from any raw input.
+ * Returns null if no valid 11-char ID can be extracted.
+ */
+function getYouTubeEmbedUrl(raw: string): string | null {
+  const id = extractYouTubeId(raw);
+  if (id === null) return null;
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.watchhubsync.online";
+  return (
+    `https://www.youtube.com/embed/${id}` +
+    `?enablejsapi=1&origin=${encodeURIComponent(origin)}&rel=0&modestbranding=1&fs=1`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -112,32 +134,32 @@ function extractYouTubeId(value: string): string | null {
 // ---------------------------------------------------------------------------
 
 interface YouTubePlayerProps {
-  readonly videoId: string;
+  readonly embedUrl: string;
   readonly iframeRef: React.RefObject<HTMLIFrameElement>;
 }
 
-function YouTubePlayer({ videoId, iframeRef }: YouTubePlayerProps) {
-  const origin =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://www.watchhubsync.online";
-
-  const src = [
-    `https://www.youtube.com/embed/${videoId}`,
-    `?enablejsapi=1`,
-    `&origin=${encodeURIComponent(origin)}`,
-    `&rel=0&modestbranding=1&fs=1`,
-  ].join("");
-
+function YouTubePlayer({ embedUrl, iframeRef }: YouTubePlayerProps) {
   return (
     <iframe
       ref={iframeRef}
-      src={src}
+      src={embedUrl}
       className="h-full w-full border-0"
       title="Video player"
       allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
       allowFullScreen
     />
+  );
+}
+
+function InvalidVideoLink() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-red-500/40 bg-red-500/[0.06] px-8 text-center">
+      <span className="text-2xl">⚠️</span>
+      <p className="text-sm font-semibold text-red-400">Invalid Video Link</p>
+      <p className="text-xs text-red-400/70">
+        Please check the URL — it must be a valid youtube.com or youtu.be link.
+      </p>
+    </div>
   );
 }
 
@@ -215,10 +237,12 @@ function RoomUI({
   const platformLabel = PLATFORM_LABELS[room.platform] ?? room.platform;
   const platformBadge = PLATFORM_BADGE[room.platform]  ?? "text-neutral-400 bg-white/5 border-white/10";
 
-  const isYouTube = room.platform === "youtube";
-  const youtubeId = isYouTube && contentId !== undefined
-    ? extractYouTubeId(contentId)
+  const isYouTube   = room.platform === "youtube";
+  const embedUrl    = isYouTube && contentId !== undefined
+    ? getYouTubeEmbedUrl(contentId)
     : null;
+  // null  → not YouTube; empty string → YouTube but URL is invalid
+  const youtubeReady = isYouTube && embedUrl !== null;
 
   // ── postMessage to embedded player ──────────────────────────────────────
   const sendToPlayer = useCallback((func: string, args?: unknown) => {
@@ -369,8 +393,10 @@ function RoomUI({
             className="relative w-full overflow-hidden rounded-xl bg-black shadow-2xl"
             style={{ aspectRatio: "16 / 9" }}
           >
-            {isYouTube && youtubeId !== null ? (
-              <YouTubePlayer videoId={youtubeId} iframeRef={iframeRef} />
+            {youtubeReady && embedUrl !== null ? (
+              <YouTubePlayer embedUrl={embedUrl} iframeRef={iframeRef} />
+            ) : isYouTube ? (
+              <InvalidVideoLink />
             ) : (
               <PlatformLinkCard
                 platform={room.platform}
