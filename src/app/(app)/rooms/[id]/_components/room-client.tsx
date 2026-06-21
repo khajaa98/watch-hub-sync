@@ -334,12 +334,15 @@ function RoomUI({
   const iframeRef          = useRef<HTMLIFrameElement>(null);
   /** YouTube currentTime, updated by infoDelivery postMessages (~250ms) */
   const currentTimeRef     = useRef<number>(0);
+  /**
+   * YouTube playerState from infoDelivery:
+   *   -1 = unstarted, 0 = ended, 1 = playing, 2 = paused, 3 = buffering
+   */
+  const playerStateRef     = useRef<number>(-1);
   /** True once the guest has clicked the unlock overlay (or if they're the host) */
   const playerUnlockedRef  = useRef<boolean>(isHost);
   /** Buffered seek position waiting for guest unlock click */
   const pendingSeekRef     = useRef<number | undefined>(undefined);
-  /** Whether the host has pressed Play All (drives the 3s heartbeat) */
-  const isPlayingRef       = useRef<boolean>(false);
 
   const [showInviteModal,   setShowInviteModal]   = useState(false);
   const [liveInviteUrl,     setLiveInviteUrl]     = useState<string | null>(initialInviteUrl);
@@ -365,21 +368,24 @@ function RoomUI({
     : null;
   const youtubeReady = isYouTube && embedUrl !== null;
 
-  // ── Track YouTube currentTime via postMessage events ────────────────────
+  // ── Track YouTube currentTime + playerState via postMessage events ───────
   // YouTube sends infoDelivery messages ~every 250ms while playing.
+  // playerState values: -1=unstarted, 0=ended, 1=playing, 2=paused, 3=buffering
   useEffect(() => {
     const handler = (event: MessageEvent<unknown>) => {
       if (event.origin !== "https://www.youtube.com") return;
       try {
         const data = JSON.parse(event.data as string) as {
           event?: string;
-          info?: { currentTime?: number };
+          info?: { currentTime?: number; playerState?: number };
         };
-        if (
-          data.event === "infoDelivery" &&
-          typeof data.info?.currentTime === "number"
-        ) {
-          currentTimeRef.current = data.info.currentTime;
+        if (data.event === "infoDelivery") {
+          if (typeof data.info?.currentTime === "number") {
+            currentTimeRef.current = data.info.currentTime;
+          }
+          if (typeof data.info?.playerState === "number") {
+            playerStateRef.current = data.info.playerState;
+          }
         }
       } catch { /* ignore malformed */ }
     };
@@ -402,28 +408,45 @@ function RoomUI({
         const text   = new TextDecoder().decode(message.payload);
         const parsed = JSON.parse(text) as SyncMessage;
 
-        // ── Heartbeat (SYNC_STATE from host every 3s) ──────────────────────
+        // ── Heartbeat: state-reconciliation (host → all guests every 2s) ───
         if (parsed.type === "SYNC_STATE") {
-          // Drift correction: seek if guest is >1.5s off host's clock
-          if (typeof parsed.currentTime === "number") {
-            const drift = Math.abs(parsed.currentTime - currentTimeRef.current);
-            if (drift > 1.5) {
-              sendToPlayer("seekTo", [parsed.currentTime, true]);
-              currentTimeRef.current = parsed.currentTime;
-            }
+          const hostTime     = parsed.currentTime ?? 0;
+          const hostPlaying  = parsed.isPlaying === true;
+          const guestTime    = currentTimeRef.current;
+          const guestPlaying = playerStateRef.current === 1; // 1 = YT playing
+          const diff         = Math.abs(hostTime - guestTime);
+
+          console.log("[WHS] SYNC_STATE →", {
+            hostTime: hostTime.toFixed(2),
+            guestTime: guestTime.toFixed(2),
+            diff: diff.toFixed(2),
+            hostPlaying,
+            guestPlaying,
+          });
+
+          // Deadband: only seek if drift ≥ 1.0s to avoid micro-stuttering
+          if (diff >= 1.0) {
+            console.log("[WHS] Syncing to host:", hostTime.toFixed(2));
+            sendToPlayer("seekTo", [hostTime, true]);
+            currentTimeRef.current = hostTime;
           }
-          // If host is playing and guest isn't unlocked yet, show overlay
-          if (parsed.isPlaying === true) {
+
+          // Play enforcer
+          if (hostPlaying && !guestPlaying) {
             if (!playerUnlockedRef.current) {
-              if (typeof parsed.currentTime === "number") {
-                pendingSeekRef.current = parsed.currentTime;
-              }
+              pendingSeekRef.current = hostTime;
               setNeedsInteraction(true);
             } else {
               sendToPlayer("playVideo");
             }
-            setLastSync({ type: "play", at: new Date() });
           }
+
+          // Pause enforcer
+          if (!hostPlaying && guestPlaying) {
+            sendToPlayer("pauseVideo");
+          }
+
+          setLastSync({ type: hostPlaying ? "play" : "pause", at: new Date() });
           return;
         }
 
@@ -465,7 +488,6 @@ function RoomUI({
   const broadcastSync = useCallback(
     (type: "play" | "pause") => {
       if (!isHost) return;
-      isPlayingRef.current = type === "play";
       const position = currentTimeRef.current;
       const msg: SyncMessage = position > 0
         ? { type, position, ts: Date.now() }
@@ -479,20 +501,21 @@ function RoomUI({
     [isHost, lkRoom, sendToPlayer],
   );
 
-  // ── Heartbeat: broadcast SYNC_STATE every 3s while host is playing ───────
+  // ── Heartbeat: broadcast SYNC_STATE every 2s (host only) ────────────────
+  // Fires unconditionally — guests reconcile both play AND pause state.
+  // Uses playerStateRef so manual in-player pause/play is reflected too.
   useEffect(() => {
     if (!isHost) return;
     const interval = setInterval(() => {
-      if (!isPlayingRef.current) return;
       const msg: SyncMessage = {
         type: "SYNC_STATE",
-        isPlaying: true,
+        isPlaying: playerStateRef.current === 1,
         currentTime: currentTimeRef.current,
         ts: Date.now(),
       };
       const encoded = new TextEncoder().encode(JSON.stringify(msg));
       void lkRoom.localParticipant.publishData(encoded, { reliable: false, topic: "sync" });
-    }, 3000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [isHost, lkRoom]);
 
