@@ -135,9 +135,14 @@ const nextConfig = {
             value: "strict-origin-when-cross-origin",
           },
           // Restrict browser features
+          // clipboard-write: needed for "Copy invite link" button
+          // autoplay + picture-in-picture: granted to YouTube iframe for theater player
           {
             key:   "Permissions-Policy",
             value: [
+              "clipboard-write=(self)",
+              "autoplay=(self \"https://www.youtube.com\")",
+              "picture-in-picture=(self \"https://www.youtube.com\")",
               "camera=()",
               "microphone=()",
               "geolocation=()",

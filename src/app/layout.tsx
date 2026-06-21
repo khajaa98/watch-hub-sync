@@ -85,6 +85,14 @@ export const metadata: Metadata = {
     title: "Watch Hub Sync",
   },
 
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32",        type: "image/x-icon" },
+    ],
+    shortcut: "/favicon.ico",
+  },
+
   robots: {
     index:  true,
     follow: true,
