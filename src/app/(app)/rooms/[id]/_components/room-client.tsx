@@ -54,8 +54,12 @@ interface RoomClientProps {
 }
 
 interface SyncMessage {
-  type: "play" | "pause" | "seek";
+  type: "play" | "pause" | "seek" | "SYNC_STATE";
   position?: number | undefined;
+  /** heartbeat only */
+  isPlaying?: boolean | undefined;
+  /** heartbeat only — host's currentTime at broadcast */
+  currentTime?: number | undefined;
   ts: number;
 }
 
@@ -327,14 +331,22 @@ function RoomUI({
   const connectionState = useConnectionState();
   const participants    = useParticipants();
   const lkRoom          = useRoomContext();
-  const iframeRef       = useRef<HTMLIFrameElement>(null);
-  // Tracks current playback time as reported by the YouTube iframe postMessage API
-  const currentTimeRef  = useRef<number>(0);
+  const iframeRef          = useRef<HTMLIFrameElement>(null);
+  /** YouTube currentTime, updated by infoDelivery postMessages (~250ms) */
+  const currentTimeRef     = useRef<number>(0);
+  /** True once the guest has clicked the unlock overlay (or if they're the host) */
+  const playerUnlockedRef  = useRef<boolean>(isHost);
+  /** Buffered seek position waiting for guest unlock click */
+  const pendingSeekRef     = useRef<number | undefined>(undefined);
+  /** Whether the host has pressed Play All (drives the 3s heartbeat) */
+  const isPlayingRef       = useRef<boolean>(false);
 
   const [showInviteModal,   setShowInviteModal]   = useState(false);
   const [liveInviteUrl,     setLiveInviteUrl]     = useState<string | null>(initialInviteUrl);
   const [isFetchingInvite,  setIsFetchingInvite]  = useState(false);
   const [lastSync,          setLastSync]           = useState<LastSync | null>(null);
+  /** Guest-only: show "Click to join sync" overlay when autoplay is blocked */
+  const [needsInteraction,  setNeedsInteraction]  = useState(false);
 
   const settings = (
     typeof room.settings === "object" && room.settings !== null
@@ -384,12 +396,38 @@ function RoomUI({
   }, []);
 
   // ── DataChannel receive ──────────────────────────────────────────────────
-  // On play/pause: if host's timestamp differs from ours by >2s, seek first.
   const onSyncMessage = useCallback(
     (message: { payload: Uint8Array }) => {
       try {
         const text   = new TextDecoder().decode(message.payload);
         const parsed = JSON.parse(text) as SyncMessage;
+
+        // ── Heartbeat (SYNC_STATE from host every 3s) ──────────────────────
+        if (parsed.type === "SYNC_STATE") {
+          // Drift correction: seek if guest is >1.5s off host's clock
+          if (typeof parsed.currentTime === "number") {
+            const drift = Math.abs(parsed.currentTime - currentTimeRef.current);
+            if (drift > 1.5) {
+              sendToPlayer("seekTo", [parsed.currentTime, true]);
+              currentTimeRef.current = parsed.currentTime;
+            }
+          }
+          // If host is playing and guest isn't unlocked yet, show overlay
+          if (parsed.isPlaying === true) {
+            if (!playerUnlockedRef.current) {
+              if (typeof parsed.currentTime === "number") {
+                pendingSeekRef.current = parsed.currentTime;
+              }
+              setNeedsInteraction(true);
+            } else {
+              sendToPlayer("playVideo");
+            }
+            setLastSync({ type: "play", at: new Date() });
+          }
+          return;
+        }
+
+        // ── One-shot play / pause / seek ────────────────────────────────────
         setLastSync({ type: parsed.type, at: new Date() });
 
         // Time-correction: snap to host's position if drift > 2 seconds
@@ -400,8 +438,19 @@ function RoomUI({
           }
         }
 
-        if (parsed.type === "play")  sendToPlayer("playVideo");
-        if (parsed.type === "pause") sendToPlayer("pauseVideo");
+        if (parsed.type === "play") {
+          if (!playerUnlockedRef.current) {
+            // Buffer the target position; show overlay so user can unlock
+            pendingSeekRef.current = parsed.position;
+            setNeedsInteraction(true);
+          } else {
+            sendToPlayer("playVideo");
+          }
+        }
+        if (parsed.type === "pause") {
+          setNeedsInteraction(false);
+          sendToPlayer("pauseVideo");
+        }
         if (parsed.type === "seek" && parsed.position !== undefined) {
           sendToPlayer("seekTo", [parsed.position, true]);
         }
@@ -413,10 +462,10 @@ function RoomUI({
   useDataChannel("sync", onSyncMessage);
 
   // ── Broadcast sync (host only) + apply locally ──────────────────────────
-  // Includes currentTime so guests can correct temporal drift.
   const broadcastSync = useCallback(
     (type: "play" | "pause") => {
       if (!isHost) return;
+      isPlayingRef.current = type === "play";
       const position = currentTimeRef.current;
       const msg: SyncMessage = position > 0
         ? { type, position, ts: Date.now() }
@@ -429,6 +478,23 @@ function RoomUI({
     },
     [isHost, lkRoom, sendToPlayer],
   );
+
+  // ── Heartbeat: broadcast SYNC_STATE every 3s while host is playing ───────
+  useEffect(() => {
+    if (!isHost) return;
+    const interval = setInterval(() => {
+      if (!isPlayingRef.current) return;
+      const msg: SyncMessage = {
+        type: "SYNC_STATE",
+        isPlaying: true,
+        currentTime: currentTimeRef.current,
+        ts: Date.now(),
+      };
+      const encoded = new TextEncoder().encode(JSON.stringify(msg));
+      void lkRoom.localParticipant.publishData(encoded, { reliable: false, topic: "sync" });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isHost, lkRoom]);
 
   // ── Persistent invite: fetch/rotate token on demand ─────────────────────
   const handleInviteClick = useCallback(async () => {
@@ -544,6 +610,35 @@ function RoomUI({
                 contentTitle={contentTitle}
                 contentId={contentId}
               />
+            )}
+
+            {/* Guest autoplay-unlock overlay — shown when browser blocks playVideo() */}
+            {!isHost && needsInteraction && (
+              <button
+                type="button"
+                onClick={() => {
+                  playerUnlockedRef.current = true;
+                  setNeedsInteraction(false);
+                  // Apply buffered seek position so guest starts at host's timestamp
+                  if (pendingSeekRef.current !== undefined) {
+                    sendToPlayer("seekTo", [pendingSeekRef.current, true]);
+                    pendingSeekRef.current = undefined;
+                  }
+                  sendToPlayer("playVideo");
+                }}
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-black/65 backdrop-blur-sm"
+                aria-label="Click to join sync and start playback"
+              >
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/10 ring-2 ring-white/25 transition-transform hover:scale-105">
+                  <Play className="h-9 w-9 translate-x-0.5 fill-white text-white" />
+                </div>
+                <span className="text-sm font-medium text-white/80">
+                  Click to join sync
+                </span>
+                <span className="text-xs text-white/40">
+                  Browser requires a tap before video can play
+                </span>
+              </button>
             )}
 
             {/* HUD overlay */}
