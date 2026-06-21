@@ -316,20 +316,25 @@ function InviteModal({ inviteUrl, onClose }: InviteModalProps) {
 // ---------------------------------------------------------------------------
 
 function RoomUI({
+  roomId,
   room,
   isHost,
-  inviteUrl,
+  inviteUrl: initialInviteUrl,
   userId,
   displayName: _displayName,
-}: Omit<RoomClientProps, "roomId">) {
+}: RoomClientProps) {
   const router          = useRouter();
   const connectionState = useConnectionState();
   const participants    = useParticipants();
   const lkRoom          = useRoomContext();
   const iframeRef       = useRef<HTMLIFrameElement>(null);
+  // Tracks current playback time as reported by the YouTube iframe postMessage API
+  const currentTimeRef  = useRef<number>(0);
 
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [lastSync, setLastSync]     = useState<LastSync | null>(null);
+  const [showInviteModal,   setShowInviteModal]   = useState(false);
+  const [liveInviteUrl,     setLiveInviteUrl]     = useState<string | null>(initialInviteUrl);
+  const [isFetchingInvite,  setIsFetchingInvite]  = useState(false);
+  const [lastSync,          setLastSync]           = useState<LastSync | null>(null);
 
   const settings = (
     typeof room.settings === "object" && room.settings !== null
@@ -346,8 +351,29 @@ function RoomUI({
   const embedUrl    = isYouTube && contentId !== undefined
     ? getYouTubeEmbedUrl(contentId)
     : null;
-  // null  → not YouTube; empty string → YouTube but URL is invalid
   const youtubeReady = isYouTube && embedUrl !== null;
+
+  // ── Track YouTube currentTime via postMessage events ────────────────────
+  // YouTube sends infoDelivery messages ~every 250ms while playing.
+  useEffect(() => {
+    const handler = (event: MessageEvent<unknown>) => {
+      if (event.origin !== "https://www.youtube.com") return;
+      try {
+        const data = JSON.parse(event.data as string) as {
+          event?: string;
+          info?: { currentTime?: number };
+        };
+        if (
+          data.event === "infoDelivery" &&
+          typeof data.info?.currentTime === "number"
+        ) {
+          currentTimeRef.current = data.info.currentTime;
+        }
+      } catch { /* ignore malformed */ }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   // ── postMessage to embedded player ──────────────────────────────────────
   const sendToPlayer = useCallback((func: string, args?: unknown) => {
@@ -358,6 +384,7 @@ function RoomUI({
   }, []);
 
   // ── DataChannel receive ──────────────────────────────────────────────────
+  // On play/pause: if host's timestamp differs from ours by >2s, seek first.
   const onSyncMessage = useCallback(
     (message: { payload: Uint8Array }) => {
       try {
@@ -365,14 +392,20 @@ function RoomUI({
         const parsed = JSON.parse(text) as SyncMessage;
         setLastSync({ type: parsed.type, at: new Date() });
 
+        // Time-correction: snap to host's position if drift > 2 seconds
+        if (parsed.position !== undefined) {
+          const drift = Math.abs(parsed.position - currentTimeRef.current);
+          if (drift > 2) {
+            sendToPlayer("seekTo", [parsed.position, true]);
+          }
+        }
+
         if (parsed.type === "play")  sendToPlayer("playVideo");
         if (parsed.type === "pause") sendToPlayer("pauseVideo");
         if (parsed.type === "seek" && parsed.position !== undefined) {
           sendToPlayer("seekTo", [parsed.position, true]);
         }
-      } catch {
-        // ignore malformed
-      }
+      } catch { /* ignore malformed */ }
     },
     [sendToPlayer],
   );
@@ -380,10 +413,14 @@ function RoomUI({
   useDataChannel("sync", onSyncMessage);
 
   // ── Broadcast sync (host only) + apply locally ──────────────────────────
+  // Includes currentTime so guests can correct temporal drift.
   const broadcastSync = useCallback(
     (type: "play" | "pause") => {
       if (!isHost) return;
-      const msg: SyncMessage = { type, ts: Date.now() };
+      const position = currentTimeRef.current;
+      const msg: SyncMessage = position > 0
+        ? { type, position, ts: Date.now() }
+        : { type, ts: Date.now() };
       const encoded = new TextEncoder().encode(JSON.stringify(msg));
       void lkRoom.localParticipant.publishData(encoded, { reliable: true, topic: "sync" });
       if (type === "play")  sendToPlayer("playVideo");
@@ -392,6 +429,25 @@ function RoomUI({
     },
     [isHost, lkRoom, sendToPlayer],
   );
+
+  // ── Persistent invite: fetch/rotate token on demand ─────────────────────
+  const handleInviteClick = useCallback(async () => {
+    if (liveInviteUrl !== null) {
+      setShowInviteModal(true);
+      return;
+    }
+    setIsFetchingInvite(true);
+    try {
+      const res = await fetch(`/api/rooms/${roomId}/invite`, { method: "POST" });
+      if (res.ok) {
+        const { inviteUrl: url } = await res.json() as { inviteUrl: string };
+        setLiveInviteUrl(url);
+        setShowInviteModal(true);
+      }
+    } finally {
+      setIsFetchingInvite(false);
+    }
+  }, [liveInviteUrl, roomId]);
 
   // ── Leave / End ──────────────────────────────────────────────────────────
   const handleLeave = useCallback(() => {
@@ -421,14 +477,17 @@ function RoomUI({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Invite toggle (host only) */}
-          {isHost && inviteUrl !== null && (
+          {/* Invite button — always visible for host; fetches URL on demand */}
+          {isHost && (
             <button
               type="button"
-              onClick={() => setShowInviteModal((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs text-violet-400 transition-colors hover:bg-violet-500/20"
+              onClick={() => void handleInviteClick()}
+              disabled={isFetchingInvite}
+              className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 py-1 text-xs text-violet-400 transition-colors hover:bg-violet-500/20 disabled:opacity-50"
             >
-              <Users className="h-3.5 w-3.5" />
+              {isFetchingInvite
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Users className="h-3.5 w-3.5" />}
               Invite
             </button>
           )}
@@ -459,9 +518,9 @@ function RoomUI({
       </header>
 
       {/* ── Invite modal (portal) ───────────────────────────────────────── */}
-      {showInviteModal && inviteUrl !== null && (
+      {showInviteModal && liveInviteUrl !== null && (
         <InviteModal
-          inviteUrl={inviteUrl}
+          inviteUrl={liveInviteUrl}
           onClose={() => setShowInviteModal(false)}
         />
       )}
