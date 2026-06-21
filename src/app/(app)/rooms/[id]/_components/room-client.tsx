@@ -358,7 +358,7 @@ function RoomUI({
 // ---------------------------------------------------------------------------
 
 export function RoomClient(props: RoomClientProps) {
-  const { roomId, displayName } = props;
+  const { roomId } = props;
   const [token, setToken]       = useState<string | null>(null);
   const [livekitUrl, setLivekitUrl] = useState<string | null>(null);
   const [tokenError, setTokenError] = useState<string | null>(null);
