@@ -32,7 +32,10 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { AccessToken, type VideoGrant } from "livekit-server-sdk";
-import { createSupabaseRouteHandlerClient } from "@/lib/supabase/server";
+import {
+  createSupabaseRouteHandlerClient,
+  createSupabaseServiceClient,
+} from "@/lib/supabase/server";
 import { createLogger } from "@/lib/logger";
 import type { RoomRow, ParticipantRow, UserRow } from "@/types/supabase";
 
@@ -129,12 +132,12 @@ export async function GET(
   }
 
   // ── 2. Supabase session — network-verified, not JWT-only ────────────────
-  const supabase = createSupabaseRouteHandlerClient();
+  const authClient = createSupabaseRouteHandlerClient();
 
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } = await authClient.auth.getUser();
 
   if (authError !== null || user === null) {
     return NextResponse.json<ErrorResponseBody>(
@@ -142,6 +145,9 @@ export async function GET(
       { status: 401 },
     );
   }
+
+  // Service client for all DB reads — bypasses RLS (auth already verified above).
+  const supabase = createSupabaseServiceClient();
 
   // ── 3. Room existence + status check ────────────────────────────────────
   const { data: roomRaw, error: roomError } = await supabase
