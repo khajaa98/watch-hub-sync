@@ -119,14 +119,9 @@ function extractYouTubeId(value: string): string | null {
 function getYouTubeEmbedUrl(raw: string): string | null {
   const id = extractYouTubeId(raw);
   if (id === null) return null;
-  const origin =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://www.watchhubsync.online";
-  return (
-    `https://www.youtube.com/embed/${id}` +
-    `?enablejsapi=1&origin=${encodeURIComponent(origin)}&rel=0&modestbranding=1&fs=1`
-  );
+  // origin param omitted — some strict browser/CSP setups block the embed when
+  // the origin param doesn't exactly match the served domain. Re-add once stable.
+  return `https://www.youtube.com/embed/${id}?enablejsapi=1&rel=0&modestbranding=1&fs=1`;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,13 +134,19 @@ interface YouTubePlayerProps {
 }
 
 function YouTubePlayer({ embedUrl, iframeRef }: YouTubePlayerProps) {
+  useEffect(() => {
+    console.log("[WHS] Rendering iframe with src:", embedUrl);
+  }, [embedUrl]);
+
   return (
     <iframe
+      key={embedUrl}
       ref={iframeRef}
       src={embedUrl}
       className="h-full w-full border-0"
-      title="Video player"
-      allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+      title="YouTube video player"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+      sandbox="allow-same-origin allow-scripts allow-presentation allow-forms"
       allowFullScreen
     />
   );
